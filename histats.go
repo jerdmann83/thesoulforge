@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
+	"log"
+	"net/http"
 	"time"
 )
 
@@ -20,20 +21,48 @@ type Series struct {
 	values                 []Metric
 }
 
-func churnValues(out chan Metric, interval time.Duration) {
+type Endpoint struct {
+	url string
+}
+
+func floatMillisecond(t time.Duration) float64 {
+	return float64(t/time.Microsecond) / 1000
+}
+
+func pollEndpoint(out chan Metric, ep Endpoint, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	for range ticker.C {
+		st := time.Now()
+		_, err := http.Get(ep.url)
+		if err != nil {
+			latency := time.Now().Sub(st)
+			out <- Metric{
+				time.Now().Unix(),
+				floatMillisecond(latency)}
+		}
+	}
+}
+
+func dumpMetrics(w http.ResponseWriter, req *http.Request) {
+	fmt.Fprintf(w, "rofl hi")
+}
+
+func collectSeries(in chan Metric) {
 	for {
-		out <- Metric{time.Now().Unix(), rand.Float64()}
-		time.Sleep(interval)
+		s := <-in
+		fmt.Printf("collect: got %s\n", s)
 	}
 }
 
 func main() {
+	endpoints := []string{"https://www.google.com"}
 	out := make(chan Metric)
-	go churnValues(out, 1*time.Second)
 
-	for {
-		s := <-out
-		fmt.Printf("got %s\n", s)
+	go collectSeries(out)
+	for _, url := range endpoints {
+		go pollEndpoint(out, Endpoint{url}, 1*time.Second)
 	}
-	fmt.Println("vim-go")
+
+	http.HandleFunc("/metrics", dumpMetrics)
+	log.Fatal(http.ListenAndServe(":8081", nil))
 }
