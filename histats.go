@@ -2,15 +2,21 @@ package main
 
 import (
 	"fmt"
+	"github.com/jerdmann/thesoulforge/poller"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
 
+func toMetric(t time.Duration) float64 {
+	return float64(t/time.Microsecond) / 1000
+}
+
 type Metric struct {
-	timestamp int64
-	value     float64
+	// timestamp int64
+	value float64
 }
 
 type Series struct {
@@ -18,39 +24,21 @@ type Series struct {
 	latest                 Metric
 }
 
-type Endpoint struct {
-	name, url string
-}
-
-type pollResult struct {
-	metric Metric
-	ep     Endpoint
-}
-
 type metricRepo struct {
 	metrics map[string]Series
 	sync.Mutex
 }
 
-func floatMillisecond(t time.Duration) float64 {
-	return float64(t/time.Microsecond) / 1000
+type Endpoint struct {
+	name, url string
 }
 
-func pollEndpoint(out chan pollResult, ep Endpoint, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	for range ticker.C {
-		st := time.Now()
-		_, err := http.Get(ep.url)
-		if err != nil {
-			continue
-		}
-		latency := time.Now().Sub(st)
-		out <- pollResult{
-			Metric{
-				time.Now().Unix(),
-				floatMillisecond(latency)},
-			ep}
-	}
+func (ep Endpoint) Name() string {
+	return ep.name
+}
+
+func (ep Endpoint) Url() string {
+	return ep.url
 }
 
 //func makeHandler(repo* metricRepo
@@ -63,20 +51,20 @@ func dumpMetrics(w http.ResponseWriter, req *http.Request) {
 	repo.Lock()
 	defer repo.Unlock()
 	for k, v := range repo.metrics {
-		fmt.Fprintf(w, "%v_response_ms %v", k, v.latest.value)
+		fmt.Fprintf(w, "%v_response_ms %v\n", k, v.latest.value)
 	}
 
 }
 
-func collectSeries(in chan pollResult) {
+func collectSeries(in chan poller.Result) {
 	for {
 		result := <-in
 		repo.Lock()
-		name := result.ep.name
+		name := result.Ep.Name()
 		// TODO golang doesn't allow direct assignment of map struct members?
 		// really awkward copy and reinsert for now
 		updated := repo.metrics[name]
-		updated.latest = result.metric
+		updated.latest = Metric{toMetric(result.Latency)}
 		repo.metrics[name] = updated
 		repo.Unlock()
 	}
@@ -90,13 +78,28 @@ func main() {
 	repo.metrics = make(map[string]Series)
 
 	endpoints := map[string]string{
-		"google": "https://www.google.com",
+		"Amazon":    "amazon.com",
+		"Facebook":  "facebook.com",
+		"Google":    "google.com",
+		"Instagram": "instagram.com",
+		"LinkedIn":  "linkedin.com",
+		"Netflix":   "netflix.com",
+		"Reddit":    "reddit.com",
+		"Twitch":    "twitch.tv",
+		"Twitter":   "twitter.com",
+		"Wikipedia": "wikipedia.org",
+		"Yahoo":     "yahoo.com",
+		"YouTube":   "youtube.com",
 	}
-	out := make(chan pollResult)
+	out := make(chan poller.Result)
 
 	go collectSeries(out)
 	for name, url := range endpoints {
-		go pollEndpoint(out, Endpoint{name, url}, 1*time.Second)
+		go poller.Poll(
+			Endpoint{strings.ToLower(name),
+				"https://www." + url},
+			out,
+			1*time.Second)
 	}
 
 	http.HandleFunc("/metrics", dumpMetrics)
