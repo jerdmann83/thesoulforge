@@ -51,7 +51,8 @@ func dumpMetrics(w http.ResponseWriter, req *http.Request) {
 	repo.Lock()
 	defer repo.Unlock()
 	for k, v := range repo.metrics {
-		fmt.Fprintf(w, "%v_response_ms %v\n", k, v.latest.value)
+		fmt.Fprintf(w, "web_response_ms{site=\"%v\",group=\"internet\"} %v\n",
+			k, v.latest.value)
 	}
 
 }
@@ -59,6 +60,10 @@ func dumpMetrics(w http.ResponseWriter, req *http.Request) {
 func collectSeries(in chan poller.Result) {
 	for {
 		result := <-in
+		if result.Error != nil {
+			continue
+		}
+
 		repo.Lock()
 		name := result.Ep.Name()
 		// TODO golang doesn't allow direct assignment of map struct members?

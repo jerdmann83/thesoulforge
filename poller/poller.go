@@ -7,6 +7,7 @@ import (
 )
 
 type Result struct {
+	Error   error
 	Latency time.Duration
 	Ep      Pollable
 }
@@ -20,14 +21,16 @@ func Poll(ep Pollable, out chan Result, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	for range ticker.C {
 		st := time.Now()
-		_, err := http.Get(ep.Url())
+		resp, err := http.Get(ep.Url())
 		if err != nil {
-			fmt.Println(ep.Url(), " fail")
+			fmt.Println(ep.Url(), " failed: ", err)
 			continue
 		}
 		latency := time.Now().Sub(st)
 		out <- Result{
+			err,
 			latency,
 			ep}
+		resp.Body.Close()
 	}
 }
