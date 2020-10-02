@@ -32,11 +32,13 @@ pub struct Config {
 
 impl fmt::Display for Config {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "query={} fnames=[{}] ot={}", 
-               &self.query,
-               &self.filenames.join(","),
-               &self.output_type,
-               )
+        write!(
+            f,
+            "query={} fnames=[{}] ot={}",
+            &self.query,
+            &self.filenames.join(","),
+            &self.output_type,
+        )
     }
 }
 
@@ -58,22 +60,21 @@ fn run_one(filename: &str, config: &Config) -> io::Result<()> {
         if config.filenames.len() > 1 {
             match &config.output_type {
                 OutputType::Color => {
-                    prefix = format!("{}{}{}:", 
-                                    color::Fg(color::Magenta),
-                                    &filename,
-                                    color::Fg(color::Reset),
-                                    ).to_string();
-                },
+                    prefix = format!(
+                        "{}{}{}:",
+                        color::Fg(color::Magenta),
+                        &filename,
+                        color::Fg(color::Reset),
+                    )
+                    .to_string();
+                }
                 _ => {
-                    prefix = format!("{}:", 
-                                    &filename,
-                                    ).to_string();
+                    prefix = format!("{}:", &filename,).to_string();
                 }
             }
         }
 
         match config.output_type {
-
             // Matching files only?  Print the name and stop processing further
             // matches.
             OutputType::FilesWithMatch => {
@@ -82,8 +83,7 @@ fn run_one(filename: &str, config: &Config) -> io::Result<()> {
             }
 
             // This case is handled after the search is complete.
-            OutputType::FilesWithoutMatch => {
-            }
+            OutputType::FilesWithoutMatch => {}
 
             // Plain output?  Simply print the matching line.
             OutputType::Plain => println!("{}{}", &prefix, mt.line),
@@ -93,24 +93,16 @@ fn run_one(filename: &str, config: &Config) -> io::Result<()> {
             OutputType::Color => {
                 let mut dup = mt.line.clone();
                 for pair in mt.matches {
-                    let mut chunk : String = dup.drain(..pair.0).collect();
-                    print!("{}{}{}", 
-                           prefix,
-                           color::Fg(color::Reset),
-                           chunk);
+                    let mut chunk: String = dup.drain(..pair.0).collect();
+                    print!("{}{}{}", prefix, color::Fg(color::Reset), chunk);
                     chunk = dup.drain(..(pair.1 - pair.0)).collect();
-                    print!("{}{}", 
-                           color::Fg(color::Red),
-                           chunk);
+                    print!("{}{}", color::Fg(color::Red), chunk);
 
                     // Only want the file prefix for the first chunk in the
                     // line.  Unset it for any further chunks (if any).
                     prefix = "".to_string();
                 }
-                print!("{}{}{}", 
-                       color::Fg(color::Reset),
-                       dup,
-                       "\n");
+                print!("{}{}{}", color::Fg(color::Reset), dup, "\n");
             }
         }
     }
@@ -120,12 +112,13 @@ fn run_one(filename: &str, config: &Config) -> io::Result<()> {
             if zero_matches {
                 println!("{}", filename);
             }
-        },
+        }
         _ => {}
     }
     Ok(())
 }
 
+#[derive(Debug)]
 pub struct Match {
     // the line itself
     line: String,
@@ -149,36 +142,36 @@ pub fn search(query: &str, contents: &str) -> Vec<Match> {
                         // past the end f it.
                         let begin = i;
                         let end = i + query.len();
-						matches.push((begin, end));	
+                        matches.push((begin, end));
                         dup.drain(..end);
                     }
                 }
             }
-            results.push(Match{
-                line: line.to_string(), 
+            results.push(Match {
+                line: line.to_string(),
                 matches: matches,
-			});
+            });
         }
     }
     results
 }
 
-// TODO: super need to update the below....
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn one_result() {
-        let query = "duct";
+        let query = "productive";
         let contents = "
 Rust:
 safe, fast, productive.
 Pick three.";
 
-        assert_eq!(
-            vec!["safe, fast, productive."],
-            search(query, contents)
-            );
+        let matches = search(query, contents);
+        assert_eq!(matches.len(), 1);
+        let result = &matches[0];
+        assert_eq!(result.line, "safe, fast, productive.");
+        assert_eq!(result.matches[0], (12, 22));
     }
 }
