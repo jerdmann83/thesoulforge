@@ -1,7 +1,12 @@
-use crate::SearchResult;
-use crate::SharedNode;
+use crate::node::SharedNode;
 use std::collections::VecDeque;
 use std::rc::Rc;
+
+#[derive(Debug)]
+pub struct SearchResult {
+    node: SharedNode,
+    hops: usize,
+}
 
 pub fn search_depth_first(node: &SharedNode, name: &str) -> Option<SearchResult> {
     let qm = QueueMeta {
@@ -64,8 +69,23 @@ fn search_impl(node: &SharedNode, name: &str, mut qm: QueueMeta) -> Option<Searc
 mod tests {
     use super::search_breadth_first;
     use super::search_depth_first;
-    use crate::Node;
+    use crate::node::Node;
+    use crate::node::SharedNode;
     use std::rc::Rc;
+
+    fn assert_bfs(top: &SharedNode, name: &str, expected_node: &SharedNode, hops: usize) {
+        let res = search_breadth_first(&top, name).unwrap();
+        assert!(Rc::ptr_eq(&expected_node, &res.node));
+        assert_eq!(res.node.borrow().name, expected_node.borrow().name);
+        assert_eq!(res.hops, hops);
+    }
+
+    fn assert_dfs(top: &SharedNode, name: &str, expected_node: &SharedNode, hops: usize) {
+        let res = search_depth_first(&top, name).unwrap();
+        assert!(Rc::ptr_eq(&expected_node, &res.node));
+        assert_eq!(res.node.borrow().name, expected_node.borrow().name);
+        assert_eq!(res.hops, hops);
+    }
 
     #[test]
     fn bfs_works() {
@@ -85,19 +105,9 @@ mod tests {
         c2.borrow_mut().push(&d2);
         c3.borrow_mut().push(&d3);
 
-        let res = search_breadth_first(&top, "top").unwrap();
-        assert!(Rc::ptr_eq(&top, &res.node));
-        assert_eq!(res.node.borrow().name, top.borrow().name);
-        assert_eq!(res.hops, 1);
-
-        let res = search_breadth_first(&top, "c2").unwrap();
-        assert!(Rc::ptr_eq(&c2, &res.node));
-        assert_eq!(res.node.borrow().name, c2.borrow().name);
-        assert_eq!(res.hops, 3);
-
-        let res = search_breadth_first(&top, "d3").unwrap();
-        assert_eq!(res.node.borrow().name, d3.borrow().name);
-        assert_eq!(res.hops, 7);
+        assert_bfs(&top, "top", &top, 1);
+        assert_bfs(&top, "c2", &c2, 3);
+        assert_bfs(&top, "d3", &d3, 7);
 
         let res = search_breadth_first(&top, "not_exist");
         assert!(res.is_none());
@@ -121,17 +131,9 @@ mod tests {
         c2.borrow_mut().push(&d2);
         c3.borrow_mut().push(&d3);
 
-        let res = search_depth_first(&top, "top").unwrap();
-        assert_eq!(res.node.borrow().name, top.borrow().name);
-        assert_eq!(res.hops, 1);
-
-        let res = search_depth_first(&top, "c2").unwrap();
-        assert_eq!(res.node.borrow().name, c2.borrow().name);
-        assert_eq!(res.hops, 4);
-
-        let res = search_depth_first(&top, "d3").unwrap();
-        assert_eq!(res.node.borrow().name, d3.borrow().name);
-        assert_eq!(res.hops, 3);
+        assert_dfs(&top, "top", &top, 1);
+        assert_dfs(&top, "c2", &c2, 4);
+        assert_dfs(&top, "d3", &d3, 3);
 
         let res = search_depth_first(&top, "not_exist");
         assert!(res.is_none());
