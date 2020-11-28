@@ -1,135 +1,79 @@
-use std::error::Error;
-use std::{thread, time};
-use std::net::TcpStream;
 use std::io::prelude::*;
-// use tokio::net::TcpStream;
-// use tokio::prelude::*;
-// fn to_redis_wire(s: &str) -> Vec<u8> {
-//     vec![1, 2, 3]
-// }
+use std::net::TcpStream;
+use std::{thread, time};
 
-pub struct RedisError {
-    repr: String,
-}
-impl RedisError {
-    pub fn new(repr: &str) -> Self {
-        RedisError{
-            repr: String::from(repr),
-        }
-    }
-}
+mod protocol;
+mod types;
 
-impl From<std::io::Error> for RedisError {
-    fn from(_: std::io::Error) -> Self {
-        RedisError::new("nope")
-    }
-}
+use protocol::*;
+use types::RedisError;
+use types::RedisResult;
 
-pub type RedisResult<T> = std::result::Result<T, RedisError>;
-
-pub enum Command {
-    Set { key: String, val: String },
-}
-
-impl Command {
-    pub fn new(s: &str) -> RedisResult<Command> {
-        let tokens = s.split_whitespace();
-        if tokens.count() == 0 {
-            return Err(RedisError::new("empty command"));
-        }
-
-        let tokens : Vec<&str> = s.split_whitespace().collect();
-        match tokens.as_slice() {
-            ["set", key, val] => {
-                return Ok(Command::Set{
-                    key: key.to_string(),
-                    val: val.to_string()})
-            },
-            [] | [..] => {
-                return Err(RedisError::new("unhandled command"));
-            }
-        }
-    }
-}
-
-fn to_bulk_wire(s: &str) -> Vec<u8> {
-    let mut out = String::new();
-    let tokens = s.split_whitespace();
-
-    // TODO: git gud at rust
-    // count consumes the tokens iterator
-    out.push_str(format!("*{}\r\n", tokens.count()).as_str());
-
-    // recreate this iterator so we can use it again
-    let tokens = s.split_whitespace();
-    for t in tokens {
-        out.push_str(format!("${}\r\n{}\r\n", t.len(), t).as_str());
-    }
-    out.into_bytes()
-}
-
+#[derive(Debug)]
 pub struct RedisClient {
     stream: Option<TcpStream>,
+    endpoint: String,
     prompt: String,
-}
-
-pub fn serialize(cmd: &Command) -> Vec<u8> {
-    match cmd {
-        Command::Set{key, val} => {
-            let tmp = format!("set {} {}", key, val);
-            return to_bulk_wire(tmp.as_str());
-        }
-    }
 }
 
 impl RedisClient {
     pub fn new(addr: &str) -> Self {
         // let timeout = time::Duration::from_millis(1000);
         let result = TcpStream::connect(addr);
-        let cli_stream : Option<TcpStream>;
-        let prompt : String;
+        let cli_stream: Option<TcpStream>;
+        let prompt: String;
         match result {
             Ok(stream) => {
                 cli_stream = Some(stream);
                 prompt = format!("{}>", addr);
-            },
+            }
             Err(_) => {
                 cli_stream = None;
                 prompt = String::from("not connected>");
-            },
+            }
         }
-        RedisClient{
+        RedisClient {
             stream: cli_stream,
             prompt: prompt,
+            endpoint: String::from(addr),
         }
     }
 
-    pub fn send_command(&mut self, c: &Command) -> RedisResult<Vec<u8>> {
+    pub fn send_command(&mut self, cmd: &str) -> RedisResult<Vec<u8>> {
+        match self.send_command_impl(cmd) {
+            Ok(r) => {
+                self.on_connect();
+                return Ok(r);
+            }
+            Err(r) => {
+                self.on_disconnect();
+                return Err(r);
+            }
+        }
+    }
+
+    fn send_command_impl(&mut self, cmd: &str) -> RedisResult<Vec<u8>> {
         match &mut self.stream {
             Some(stream) => {
-                let result = stream.write(serialize(&c).as_slice());
-                match result {
-                    Ok(_) => {
-                        let mut buf: Vec<u8> = Vec::new();
-                        loop {
-                            println!("next!");
-                            let bytes = stream.read(&mut buf[..])?;
-                            println!("{}", bytes);
-                        }
-                        return Ok(buf)
-                    },
-                    Err(_) => {
-                        self.on_disconnect();
-                        return Err(RedisError::new("send failed"));
-                    }
+                let s = WireType::SimpleString(cmd.to_string());
+                // stream.write_all(serialize_simple_str(&cmd).as_slice())?;
+                stream.write_all(s.serialize().as_slice())?;
+                let bufsize = 1024;
+                let mut buf: Vec<u8> = Vec::with_capacity(bufsize);
+                for _ in 0..bufsize {
+                    buf.push(0);
                 }
-
-            },
+                stream.read(buf.as_mut_slice())?;
+                return Ok(buf);
+            }
             None => {
-                self.on_disconnect();
                 return Err(RedisError::new("not connected"));
             }
         }
+    }
+
+    fn on_connect(&mut self) {
+        self.prompt = format!("{}>", self.endpoint);
     }
 
     fn on_disconnect(&mut self) {
@@ -142,15 +86,12 @@ pub fn main() {
     let mut counter: u32 = 0;
     let mut cli = RedisClient::new("127.0.0.1:6379");
     loop {
-        let cmd = Command::Set{
-            key: String::from("foo"),
-            val: counter.to_string(),
-        };
+        let cmd = format!("set foo {}", counter);
         match cli.send_command(&cmd) {
             Ok(response) => {
                 println!("{}", String::from_utf8(response).unwrap());
-            },
-            Err(err) => {
+            }
+            Err(_err) => {
                 // println!("{}", err);
                 println!("error");
             }
