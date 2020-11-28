@@ -55,14 +55,14 @@ impl RedisClient {
     fn send_command_impl(&mut self, cmd: &str) -> RedisResult<Vec<u8>> {
         match &mut self.stream {
             Some(stream) => {
-                let s = WireType::SimpleString(cmd.to_string());
-                // stream.write_all(serialize_simple_str(&cmd).as_slice())?;
-                stream.write_all(s.serialize().as_slice())?;
-                let bufsize = 1024;
-                let mut buf: Vec<u8> = Vec::with_capacity(bufsize);
-                for _ in 0..bufsize {
-                    buf.push(0);
+                let mut v: WireVec = vec![];
+                for tok in cmd.split_whitespace() {
+                    v.push(WireType::BulkString(tok.to_string()));
                 }
+                stream.write_all(v.serialize().as_slice())?;
+
+                let bufsize = 1024;
+                let mut buf: Vec<u8> = vec![0; bufsize];
                 stream.read(buf.as_mut_slice())?;
                 return Ok(buf);
             }
@@ -91,9 +91,8 @@ pub fn main() {
             Ok(response) => {
                 println!("{}", String::from_utf8(response).unwrap());
             }
-            Err(_err) => {
-                // println!("{}", err);
-                println!("error");
+            Err(err) => {
+                println!("{:?}", err);
             }
         }
         counter += 1;

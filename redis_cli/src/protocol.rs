@@ -1,12 +1,14 @@
 use crate::types::*;
 
+pub type WireVec = Vec<WireType>;
+
 #[derive(Debug, Clone)]
 pub enum WireType {
     SimpleString(String),
     BulkString(String),
     Error(String),
     Integer(i32),
-    Array(Vec<WireType>),
+    Array(WireVec),
 }
 
 pub trait Wire {
@@ -27,7 +29,9 @@ impl Wire for WireType {
                 out.push_str(&format!(":{}\r\n", i));
             }
             WireType::BulkString(s) => {
-                out.push_str(&format!("${}\r\n{}\r\n", &s.len(), &s));
+                let tmp = &format!("${}\r\n{}\r\n", &s.len(), &s);
+                println!("{}", tmp);
+                out.push_str(tmp);
             }
             WireType::Array(v) => {
                 out.push_str(&format!("*{}\r\n", v.len()));
@@ -40,7 +44,7 @@ impl Wire for WireType {
     }
 }
 
-impl Wire for Vec<WireType> {
+impl Wire for WireVec {
     fn serialize(&self) -> Vec<u8> {
         let mut out = String::new();
         out.push_str(&format!("*{}\r\n", self.len()));

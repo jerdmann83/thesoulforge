@@ -15,3 +15,6 @@
 
 # vim disease
 *.swp
+
+# ctags
+tags
