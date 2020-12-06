@@ -38,6 +38,17 @@ impl Cursor {
         cur < self.v.len()
     }
 
+    /// Clockwork bump plus skip non-unique slot combinations.
+    pub fn bump_unique(&mut self) -> bool {
+        self.bump();
+        while !self.is_unique() {
+            if !self.bump() {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// Return if all cursor slots contain unique values.  Values
     /// like 12.34.56 will return true while 1.1.2 will return false.
     pub fn is_unique(&self) -> bool {
@@ -75,11 +86,7 @@ impl Cursor {
 fn solve(target: NumT, nums: &NumVec, lim: usize) -> Option<NumT> {
     let mut cur = Cursor::new(nums.len(), lim);
     let mut sum: NumT;
-    while cur.bump() {
-        if !cur.is_unique() {
-            continue;
-        }
-
+    while cur.bump_unique() {
         let vals = cur.select(nums);
         sum = vals.unwrap().iter().sum();
 
@@ -115,20 +122,25 @@ mod test {
         let mut c = Cursor::new(20, 3);
         let mut i = 0;
         while c.bump() {
-            if c.is_unique() {
-                i += 1
-            }
+            i += 1
         }
         // Magic values stolen from a web permutations calculator thing.
+        assert_eq!(i, 7999);
+
+        let mut c = Cursor::new(20, 3);
+        let mut i = 0;
+        while c.bump_unique() {
+            i += 1
+        }
         assert_eq!(i, 6840);
     }
 
     #[test]
     fn select() {
         let mut c = Cursor::new(5, 3);
-        for _ in 0..8 {
-            c.bump();
-        }
+        c.bump_unique();
+        c.bump_unique();
+
         // cursor is [3, 1, 0]
         let input = vec![50, 51, 52, 53, 54, 55];
         assert_eq!(c.select(&input).unwrap(), vec![53, 51, 50]);
