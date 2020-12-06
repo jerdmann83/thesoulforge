@@ -72,9 +72,9 @@ impl Cursor {
     }
 }
 
-fn solve(nums: &NumVec, lim: usize) {
+fn solve(target: NumT, nums: &NumVec, lim: usize) -> Option<NumT> {
     let mut cur = Cursor::new(nums.len(), lim);
-    let mut sum: NumT = 0;
+    let mut sum: NumT;
     while cur.bump() {
         if !cur.is_unique() {
             continue;
@@ -83,12 +83,12 @@ fn solve(nums: &NumVec, lim: usize) {
         let vals = cur.select(nums);
         sum = vals.unwrap().iter().sum();
 
-        if sum == 2020 {
+        if sum == target {
             let vals = cur.select(nums);
-            println!("{}", vals.unwrap().iter().product::<NumT>());
-            break;
+            return Some(vals.unwrap().iter().product::<NumT>());
         }
     }
+    None
 }
 
 fn main() {
@@ -100,7 +100,10 @@ fn main() {
         nums.push(l.parse::<NumT>().unwrap());
     }
 
-    solve(&nums, 3);
+    match solve(2020, &nums, 3) {
+        Some(n) => println!("{}", n),
+        None => println!("{}", "no solution"),
+    };
 }
 
 #[cfg(test)]
