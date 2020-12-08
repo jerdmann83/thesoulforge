@@ -15,6 +15,12 @@ impl Tracker {
         }
     }
 
+    fn select(&mut self, cmd: &str) {
+        for c in cmd.chars() {
+            self.on_char(&c);
+        }
+    }
+
     fn on_char(&mut self, c: &char) {
         match c {
             'F' => self.row.1 = mid_low(self.row.0, self.row.1),
@@ -44,21 +50,24 @@ fn main() {
     let mut buf = String::new();
     stdin().read_to_string(&mut buf).unwrap();
 
-    let mut max_seat_id: u32 = 0;
     let mut seat_ids: Vec<u32> = vec![];
+    let mut ids = HashSet::new();
     for l in buf.split_whitespace() {
         let mut t = Tracker::new();
-        for c in l.chars() {
-            t.on_char(&c);
-        }
+        t.select(l);
         if let Some(sid) = t.get_seat_id() {
             seat_ids.push(sid);
+            ids.insert(sid);
         }
     }
+
     seat_ids.sort();
-    for idx in &seat_ids[1..seat_ids.len() - 2] {
-        if &seat_ids[(idx + 1) as usize] - &seat_ids[(idx - 1) as usize] == 2 {
-            println!("{:?}", &seat_ids[*idx as usize]);
+    let min_seat_id = seat_ids[0];
+    let max_seat_id = seat_ids[seat_ids.len() - 1];
+
+    for idx in min_seat_id..max_seat_id {
+        if !ids.contains(&idx) {
+            println!("{}", idx);
         }
     }
 }

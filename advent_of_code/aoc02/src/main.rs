@@ -1,7 +1,5 @@
-use std::io::{stdin, Read};
-
-// extern crate Regex;
 use regex::Regex;
+use std::io::{stdin, Read};
 
 struct Row {
     min: u32,
