@@ -18,3 +18,7 @@
 
 # ctags
 tags
+
+# rust stuff
+target
+Cargo.lock
