@@ -1,4 +1,3 @@
-use std::fmt;
 use std::io::{stdin, Read};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,9 +16,27 @@ impl Spot {
             _ => None,
         }
     }
+
+    fn to_char(&self) -> char {
+        match self {
+            Spot::Floor => return '.',
+            Spot::Empty => return 'L',
+            Spot::Occupied => return '#',
+        }
+    }
 }
 
 type GridT = Vec<Vec<Spot>>;
+
+// horrible, should stream to arbitrary output
+fn print(g: &GridT) {
+    for y in g {
+        for x in y {
+            print!("{}", x.to_char());
+        }
+        print!("\n");
+    }
+}
 
 fn parse(buf: &str) -> GridT {
     let mut g: GridT = vec![];
@@ -90,33 +107,33 @@ fn run_until_stable(g: &GridT) -> GridT {
     let mut g2 = g.to_vec();
     for y in 0..g2.len() {
         for x in 0..g2[0].len() {
-            let mut cur = &mut g2[y][x];
+            let cur = &mut g2[y][x];
             *cur = Spot::Empty;
         }
     }
 
-    let mut src = &mut g1;
+    let src = &mut g1;
     let mut dst = &mut g2;
 
-    let mut num = 0;
     loop {
-        num += 1;
         if *src == *dst {
-            println!("complete after {} iterations", num);
             break;
         }
 
-        // this is wildly inefficient as it swaps the values around.  my intent
-        // is to just reseat the references each cycle but this terrible
-        // brute-force approach works for now
-        std::mem::swap(src, dst);
+        // apply rules to source and update dest
+        run_one(&src, &mut dst);
 
-        run_one(&src, &mut dst, &num);
+        // then flip them so we can repeat until we hit steady-state
+        //
+        // this implementation is wildly inefficient as it swaps the values
+        // around.  my intent is to just reseat the references each cycle but
+        // this terrible brute-force approach works for now.  git gud at rust
+        std::mem::swap(src, dst);
     }
     src.to_vec()
 }
 
-fn run_one(src: &GridT, dst: &mut GridT, num: &u32) {
+fn run_one(src: &GridT, dst: &mut GridT) {
     for y in 0..src.len() {
         for x in 0..src[0].len() {
             let mut cur = src[y][x].clone();
@@ -129,21 +146,15 @@ fn run_one(src: &GridT, dst: &mut GridT, num: &u32) {
                 Spot::Empty => {
                     if neighbors(&src, x, y, Spot::Occupied) == 0 {
                         cur = Spot::Occupied;
-                        // assert!(*num == 1 || dst[y][x] == Spot::Empty);
                     }
                 }
                 Spot::Occupied => {
                     if neighbors(&src, x, y, Spot::Occupied) > 3 {
                         cur = Spot::Empty;
-                        // assert!(*num == 1 || dst[y][x] == Spot::Occupied);
                     }
                 }
-                Spot::Floor => {
-                    assert!(dst[y][x] == Spot::Floor);
-                }
+                Spot::Floor => {}
             }
-            println!("{},{} src={:?} dst={:?}", x, y, src[y][x], cur);
-
             dst[y][x] = cur;
         }
     }
@@ -156,7 +167,7 @@ fn main() {
 
     let gn = run_until_stable(&g);
     let num = count(&gn, Spot::Occupied);
-    println!("part1: {}", num);
+    println!("part1: {:?}", num);
 }
 
 #[cfg(test)]
