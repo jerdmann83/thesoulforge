@@ -158,6 +158,7 @@ fn part2(buf: &str) -> u32 {
 
     s.manhattan()
 }
+
 fn main() {
     let mut buf = String::new();
     stdin().read_to_string(&mut buf).unwrap();
