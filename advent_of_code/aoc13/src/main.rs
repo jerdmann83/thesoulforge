@@ -5,10 +5,6 @@ struct Schedule {
     ids: Vec<Option<u64>>,
 }
 
-// 2
-//  3
-//      5
-//       6
 fn next_run(id: u64, tnow: u64) -> u64 {
     let mut cur = tnow;
     loop {
