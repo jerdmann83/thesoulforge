@@ -1,9 +1,22 @@
 use itertools::Itertools;
 use regex::Regex;
+use std::collections::HashMap;
 use std::io::{stdin, Read};
 
 struct Port {
     mem: Vec<u64>,
+    mask: Vec<char>,
+}
+
+// Hashmap-based storage for v2 mode.  Here we have to support the entire 36-bit
+// address range, and given we're storing 64-bit values that means an allocation
+// of ~64GB which is just nuts.
+//
+// We can get away with a "sparse" allocation of just the allocations made in
+// the few hundred lines or so of input.  The great majority of address space is
+// never touched.
+struct Port_v2 {
+    mem: HashMap<usize, u64>,
     mask: Vec<char>,
 }
 
@@ -14,52 +27,20 @@ impl Port {
             mask: vec!['X'; mask_bits],
         }
     }
+}
 
-    fn new_v2(mem_addresses: usize, mask_bits: usize) -> Self {
-        Port {
-            mem: vec![0; mem_addresses],
+impl Port_v2 {
+    fn new(mem_addresses: usize, mask_bits: usize) -> Self {
+        Port_v2 {
+            mem: HashMap::new(),
             mask: vec!['0'; mask_bits],
         }
     }
-}
 
-fn to_addr(c: &[char]) -> usize {
-    let mut out = 0;
-    for (idx, b) in c.iter().enumerate() {
-        match *b {
-            '0' => {}
-            '1' => {
-                out |= 1 << (c.len() - idx - 1);
-            }
-            _ => unreachable!(),
-        }
-    }
-    out
-}
-
-impl Port {
-    fn set(&mut self, addr: u64, val: u64) {
-        let mut cur = 1;
-        let mut eval = val;
-        for (idx, b) in self.mask.iter().enumerate() {
-            match b {
-                'X' => continue,
-                '0' => {
-                    let m = u64::MAX ^ (1 << (self.mask.len() - idx - 1));
-                    eval &= m;
-                }
-                '1' => eval |= 1 << (self.mask.len() - idx - 1),
-                _ => unreachable!(),
-            }
-        }
-        self.mem[addr as usize] = eval;
-    }
-
-    fn set_v2(&mut self, addr: u64, val: u64) {
+    fn set(&mut self, addr: usize, val: u64) {
         let addrs = self.v2_addresses();
         for addr in addrs {
-            println!("{:?}", addr);
-            self.mem[addr] = val;
+            self.mem.insert(addr, val);
         }
     }
 
@@ -93,8 +74,39 @@ impl Port {
             }
         }
 
-        println!("{:?}", out);
         out
+    }
+}
+
+fn to_addr(c: &[char]) -> usize {
+    let mut out = 0;
+    for (idx, b) in c.iter().enumerate() {
+        match *b {
+            '0' => {}
+            '1' => {
+                out |= 1 << (c.len() - idx - 1);
+            }
+            _ => unreachable!(),
+        }
+    }
+    out
+}
+
+impl Port {
+    fn set(&mut self, addr: u64, val: u64) {
+        let mut eval = val;
+        for (idx, b) in self.mask.iter().enumerate() {
+            match b {
+                'X' => continue,
+                '0' => {
+                    let m = u64::MAX ^ (1 << (self.mask.len() - idx - 1));
+                    eval &= m;
+                }
+                '1' => eval |= 1 << (self.mask.len() - idx - 1),
+                _ => unreachable!(),
+            }
+        }
+        self.mem[addr as usize] = eval;
     }
 }
 
@@ -107,13 +119,9 @@ fn part1(buf: &str) -> u64 {
             continue;
         }
 
-        // mask = X111000X0101100001000000100011X0000X
-        // mem[4812] = 133322396
-        // mem[39136] = 1924962
         match toks[0] {
             "mask" => {
                 p.mask = toks[1].chars().collect();
-                // println!("==> {:?}", p.mask);
             }
             _ => {
                 let re = Regex::new(r"mem\[(\d+)\] = (\d+)").unwrap();
@@ -135,7 +143,7 @@ fn part1(buf: &str) -> u64 {
 }
 
 fn part2(buf: &str) -> u64 {
-    let mut p = Port::new_v2(65536, 36);
+    let mut p = Port_v2::new(36, 36);
 
     for l in buf.split("\n") {
         let toks: Vec<&str> = l.split(" = ").collect();
@@ -150,9 +158,9 @@ fn part2(buf: &str) -> u64 {
             _ => {
                 let re = Regex::new(r"mem\[(\d+)\] = (\d+)").unwrap();
                 for cap in re.captures_iter(&l) {
-                    let addr = cap[1].parse::<u64>().unwrap();
+                    let addr = cap[1].parse::<usize>().unwrap();
                     let val = cap[2].parse::<u64>().unwrap();
-                    p.set_v2(addr, val);
+                    p.set(addr, val);
                     break;
                 }
             }
@@ -160,7 +168,7 @@ fn part2(buf: &str) -> u64 {
     }
 
     let mut out = 0;
-    for val in p.mem {
+    for (_, val) in p.mem {
         out += val;
     }
     out
@@ -170,9 +178,8 @@ fn main() {
     let mut buf = String::new();
     stdin().read_to_string(&mut buf).unwrap();
 
-    println!("part1: {}", part1(&buf));
-    // my addresses are huge for part2 for some reason
-    // definitely doing something wrong...
+    // println!("part1: {}", part1(&buf));
+    // 1253623125495 too low...
     println!("part2: {}", part2(&buf));
 }
 
@@ -197,7 +204,7 @@ mod test {
 
     #[test]
     fn v2() {
-        let mut p = Port::new_v2(4, 4);
+        let mut p = Port_v2::new(4, 4);
         p.mask[0] = '1';
         p.mask[2] = 'X';
         p.mask[3] = 'X';
