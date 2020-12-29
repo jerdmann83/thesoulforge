@@ -11,6 +11,7 @@ use crate::scanner::Scanner;
 
 fn main() {
     let mut l = Lox::new();
+    println!("{:?}", env::args());
 
     match env::args().len() {
         1 => l.run_prompt(),

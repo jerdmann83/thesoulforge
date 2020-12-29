@@ -21,9 +21,6 @@ pub enum TokenType {
     Less,
     LessEqual,
 
-    Identifier,
-    String,
-    Number,
     And,
     Class,
     Else,
@@ -40,6 +37,10 @@ pub enum TokenType {
     True,
     Var,
     While,
+
+    Identifier(String),
+    String(String),
+    Number(f64),
 
     EOF,
 }

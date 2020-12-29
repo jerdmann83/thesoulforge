@@ -1,6 +1,7 @@
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 
 use crate::scanner::*;
+use std::fs::File;
 
 pub struct Lox {
     had_error: bool,
@@ -13,23 +14,28 @@ impl Lox {
 
     pub fn run(&mut self, s: &str) {
         let mut sc = Scanner::new(s);
+        println!("{:?}", sc.scan_tokens());
     }
 
     pub fn run_prompt(&mut self) {
-        let mut buf = String::new();
         loop {
             print!("> ");
-            io::stdin().read_to_string(&mut buf).unwrap();
+            io::stdout().flush();
+
+            let mut buf = String::new();
+            io::stdin().read_line(&mut buf).unwrap();
             self.run(&buf);
             self.had_error = false;
         }
     }
 
     pub fn run_file(&mut self, f: &str) {
-        self.run(f);
+        let mut buf = String::new();
+        File::open(f).unwrap().read_to_string(&mut buf);
+        self.run(&buf);
 
         if self.had_error {
-            //
+            todo!();
         }
     }
 
