@@ -69,8 +69,7 @@ impl Scanner {
             self.start = *self.current.borrow();
             self.scan_token();
         }
-        self.tokens
-            .push(Token::new(TokenType::EOF, "".to_string(), self.line));
+        self.tokens.push(Token::new(TokenType::EOF, "", self.line));
         self.tokens
     }
 
@@ -244,7 +243,7 @@ impl Scanner {
 
     fn add_token(&mut self, tt: TokenType) {
         let text = &self.source[self.start..*self.current.borrow()];
-        let token = Token::new(tt, text.to_string(), self.line);
+        let token = Token::new(tt, text, self.line);
         self.tokens.push(token);
     }
 }

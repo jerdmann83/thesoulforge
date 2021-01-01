@@ -1,6 +1,8 @@
 use std::io::{self, Read};
 use std::{env, process};
 
+mod ast_printer;
+mod expr;
 mod lox;
 mod scanner;
 mod token;
