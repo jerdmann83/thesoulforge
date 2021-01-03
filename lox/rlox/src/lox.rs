@@ -1,6 +1,10 @@
 use std::io::{self, Read, Write};
 
+use crate::ast_printer::*;
+use crate::parser::*;
 use crate::scanner::*;
+use crate::token::*;
+use crate::token_type::*;
 use std::fs::File;
 
 pub struct Lox {
@@ -14,7 +18,14 @@ impl Lox {
 
     pub fn run(&mut self, s: &str) {
         let mut sc = Scanner::new(s);
-        println!("{:?}", sc.scan_tokens());
+        let mut p = Parser::new(&sc.scan_tokens());
+        let expr = p.parse().unwrap();
+
+        if self.had_error {
+            return;
+        }
+
+        println!("{}", serialize_ast(expr));
     }
 
     pub fn run_prompt(&mut self) {
@@ -45,5 +56,12 @@ impl Lox {
 
     pub fn report(line: usize, loc: &str, msg: &str) {
         eprintln!("[line {} Error{}: {}", line, loc, msg);
+    }
+
+    pub fn token_error(t: Token, msg: &str) {
+        match t.ttype {
+            TokenType::EOF => Self::report(t.line, " at end", msg),
+            _ => Self::report(t.line, &format!(" at '{}'", t.lexeme), msg),
+        }
     }
 }

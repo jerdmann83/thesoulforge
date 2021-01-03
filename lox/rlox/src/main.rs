@@ -4,6 +4,7 @@ use std::{env, process};
 mod ast_printer;
 mod expr;
 mod lox;
+mod parser;
 mod scanner;
 mod token;
 mod token_type;

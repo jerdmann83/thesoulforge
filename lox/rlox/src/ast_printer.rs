@@ -1,36 +1,32 @@
 use crate::expr::*;
 use crate::token::*;
 use crate::token_type::*;
-use std::rc::Rc;
 
-pub fn serialize_ast(e: ExprRef) -> String {
-    format!("{}", parenthesize(e))
+pub fn serialize_ast(e: Expr) -> String {
+    format!("{}", parenthesize(&e))
 }
 
-fn parenthesize(e: ExprRef) -> String {
+fn parenthesize(e: &Expr) -> String {
     let mut buf = String::new();
-    match e.borrow().etype {
+    match e.etype {
         ExprType::Binary => {
-            buf.push_str(&format!("({}", e.borrow().token.lexeme));
-            for c in &e.borrow().children {
-                buf.push_str(&format!(" {}", &parenthesize(Rc::clone(&c))));
+            buf.push_str(&format!("({}", e.token.lexeme));
+            for c in &e.children {
+                buf.push_str(&format!(" {}", &parenthesize(&c)));
             }
             buf.push_str(")");
         }
         ExprType::Literal => {
-            buf.push_str(&format!("{}", e.borrow().token.lexeme,));
+            buf.push_str(&format!("{}", e.token.lexeme,));
         }
         ExprType::Unary => {
-            buf.push_str(&format!("({}", e.borrow().token.lexeme));
-            buf.push_str(&format!(
-                " {})",
-                parenthesize(Rc::clone(&e.borrow().children[0]))
-            ));
+            buf.push_str(&format!("({}", e.token.lexeme));
+            buf.push_str(&format!(" {})", parenthesize(&e.children[0])));
         }
         ExprType::Grouping => {
             buf.push_str(&format!("(group"));
-            for c in &e.borrow().children {
-                buf.push_str(&format!(" {}", c.borrow().token.lexeme));
+            for c in &e.children {
+                buf.push_str(&format!(" {}", c.token.lexeme));
             }
             buf.push_str(&format!(")"));
         }
