@@ -17,21 +17,25 @@ impl Lox {
     }
 
     pub fn run(&mut self, s: &str) {
-        let mut sc = Scanner::new(s);
-        let mut p = Parser::new(&sc.scan_tokens());
+        let sc = Scanner::new(s);
+        let toks = &sc.scan_tokens();
+        // println!("tokens: {:?}", toks);
+
+        let p = Parser::new(&toks);
         let expr = p.parse().unwrap();
 
         if self.had_error {
-            return;
+            todo!();
         }
 
-        println!("{}", serialize_ast(expr));
+        // println!("{:?}", expr);
+        println!("ast: {}", serialize_ast(expr));
     }
 
     pub fn run_prompt(&mut self) {
         loop {
             print!("> ");
-            io::stdout().flush();
+            let _ = io::stdout().flush();
 
             let mut buf = String::new();
             io::stdin().read_line(&mut buf).unwrap();
@@ -42,7 +46,7 @@ impl Lox {
 
     pub fn run_file(&mut self, f: &str) {
         let mut buf = String::new();
-        File::open(f).unwrap().read_to_string(&mut buf);
+        File::open(f).unwrap().read_to_string(&mut buf).unwrap();
         self.run(&buf);
 
         if self.had_error {

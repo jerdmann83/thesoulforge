@@ -1,4 +1,3 @@
-use std::io::{self, Read};
 use std::{env, process};
 
 mod ast_printer;
@@ -10,11 +9,9 @@ mod token;
 mod token_type;
 
 use crate::lox::Lox;
-use crate::scanner::Scanner;
 
 fn main() {
     let mut l = Lox::new();
-    println!("{:?}", env::args());
 
     match env::args().len() {
         1 => l.run_prompt(),

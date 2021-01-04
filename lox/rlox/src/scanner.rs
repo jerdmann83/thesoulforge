@@ -166,7 +166,7 @@ impl Scanner {
                     }
 
                     // make sure there's another digit behind the ., then
-                    // consume said .
+                    // consume the . itself
                     if self.peek() == '.' && is_digit(self.peek_next()) {
                         self.advance();
                     }

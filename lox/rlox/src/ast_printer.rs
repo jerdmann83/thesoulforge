@@ -1,6 +1,4 @@
 use crate::expr::*;
-use crate::token::*;
-use crate::token_type::*;
 
 pub fn serialize_ast(e: Expr) -> String {
     format!("{}", parenthesize(&e))
@@ -17,7 +15,7 @@ fn parenthesize(e: &Expr) -> String {
             buf.push_str(")");
         }
         ExprType::Literal => {
-            buf.push_str(&format!("{}", e.token.lexeme,));
+            buf.push_str(&format!("{}", e.token.lexeme));
         }
         ExprType::Unary => {
             buf.push_str(&format!("({}", e.token.lexeme));
@@ -38,9 +36,18 @@ fn parenthesize(e: &Expr) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::token::*;
+    use crate::token_type::*;
 
     #[test]
     fn it_prints() {
+        let e = Expr::new_binary(
+            Token::new(TokenType::Star, "*", 1),
+            Expr::new_literal(Token::new(TokenType::Number(1.0), "1", 1)),
+            Expr::new_literal(Token::new(TokenType::Number(2.0), "2", 1)),
+        );
+        assert_eq!(serialize_ast(e), "(* 1 2)");
+
         let e = Expr::new_binary(
             Token::new(TokenType::Star, "*", 1),
             Expr::new_unary(
@@ -53,7 +60,6 @@ mod test {
                 1,
             ))]),
         );
-
         assert_eq!(serialize_ast(e), "(* (- 123) (group 45.67))");
     }
 }

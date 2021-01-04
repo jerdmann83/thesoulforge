@@ -16,12 +16,4 @@ impl Token {
             line: line,
         }
     }
-
-    pub fn new_default(ttype: TokenType) -> Self {
-        Token {
-            ttype: ttype,
-            lexeme: "".to_string(),
-            line: 0,
-        }
-    }
 }

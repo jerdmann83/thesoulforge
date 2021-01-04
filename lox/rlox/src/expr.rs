@@ -54,13 +54,4 @@ impl Expr {
         };
         e
     }
-
-    pub fn new_literal_default(tt: TokenType) -> Expr {
-        let e = Expr {
-            etype: ExprType::Literal,
-            token: Token::new_default(tt),
-            children: vec![],
-        };
-        e
-    }
 }

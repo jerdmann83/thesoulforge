@@ -62,7 +62,9 @@ impl Parser {
             return false;
         }
 
-        self.previous().ttype == *tt
+        let cur = self.peek().ttype;
+        let out = std::mem::discriminant(&cur) == std::mem::discriminant(&tt);
+        out
     }
 
     fn advance(&self) {
@@ -91,7 +93,6 @@ impl Parser {
     }
 
     fn is_at_end(&self) -> bool {
-        println!("{} {}", *self.current.borrow(), self.tokens.len());
         assert!(*self.current.borrow() < self.tokens.len());
         self.peek().ttype == TokenType::EOF
     }
@@ -125,6 +126,7 @@ impl Parser {
 
     fn comparison(&self) -> ParseResult {
         let mut expr = self.term()?;
+        // println!("comparison: {:?}", expr);
 
         while self.is_match(&[
             TokenType::GreaterEqual,
@@ -142,6 +144,7 @@ impl Parser {
 
     fn term(&self) -> ParseResult {
         let mut expr = self.factor()?;
+        // println!("term: {:?}", expr);
 
         while self.is_match(&[TokenType::Minus, TokenType::Plus]) {
             let operator = self.previous();
@@ -154,11 +157,13 @@ impl Parser {
 
     fn factor(&self) -> ParseResult {
         let mut expr = self.unary()?;
+        // println!("factor: {:?}", expr);
 
         while self.is_match(&[TokenType::Slash, TokenType::Star]) {
             let operator = self.previous();
             let right = self.factor()?;
             expr = Expr::new_binary(operator, expr, right);
+            // println!("add factor: {:?}", expr);
         }
 
         Ok(expr)
@@ -166,45 +171,50 @@ impl Parser {
 
     fn unary(&self) -> ParseResult {
         let mut expr = self.primary()?;
+        // println!("unary: {:?}", expr);
 
         while self.is_match(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary()?;
             expr = Expr::new_unary(operator, right);
-            return Ok(expr);
         }
 
-        self.primary()
+        Ok(expr)
+        // self.primary()
     }
 
     fn primary(&self) -> ParseResult {
         if self.is_match(&[TokenType::False]) {
-            return Ok(Expr::new_literal_default(TokenType::False));
+            return Ok(Expr::new_literal(self.previous()));
         }
         if self.is_match(&[TokenType::True]) {
-            return Ok(Expr::new_literal_default(TokenType::True));
+            return Ok(Expr::new_literal(self.previous()));
         }
         if self.is_match(&[TokenType::Nil]) {
-            return Ok(Expr::new_literal_default(TokenType::Nil));
+            return Ok(Expr::new_literal(self.previous()));
         }
-        // todo: how to match on tuple variants where we don't care about the
-        // contained value?  hack in arbitrary values for now
+        // possibly a more idiomatic way to do this exists.  for now just hack
+        // in arbitrary values as the matching logic only cares about the
+        // variant types themselves, not the contained values
         if self.is_match(&[TokenType::Number(0.0), TokenType::String("".to_string())]) {
-            return Ok(Expr::new_literal_default(self.previous().ttype));
+            return Ok(Expr::new_literal(self.previous()));
         }
 
         if self.is_match(&[TokenType::LeftParen]) {
-            let expr = self.expression();
-            self.consume(&TokenType::RightParen, "expect ')' after expression.");
+            let expr = self.expression()?;
+            self.consume(&TokenType::RightParen, "expect ')' after expression.")?;
+            return Ok(Expr::new_grouping(&[expr]));
         }
 
-        Err(ParseError::new("no rule for expression."))
+        Err(ParseError::new(
+            &format!("no rule for expression '{:?}'", self.peek()).to_string(),
+        ))
     }
 
     fn synchronize(&self) {
         self.advance();
 
-        while (!self.is_at_end()) {
+        while !self.is_at_end() {
             if self.previous().ttype == TokenType::Semicolon {
                 return;
             }
