@@ -2,11 +2,13 @@ use std::{env, process};
 
 mod ast_printer;
 mod expr;
+mod interpreter;
 mod lox;
 mod parser;
 mod scanner;
 mod token;
 mod token_type;
+mod value;
 
 use crate::lox::Lox;
 

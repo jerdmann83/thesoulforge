@@ -170,17 +170,13 @@ impl Parser {
     }
 
     fn unary(&self) -> ParseResult {
-        let mut expr = self.primary()?;
-        // println!("unary: {:?}", expr);
-
         while self.is_match(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary()?;
-            expr = Expr::new_unary(operator, right);
+            return Ok(Expr::new_unary(operator, right));
         }
 
-        Ok(expr)
-        // self.primary()
+        self.primary()
     }
 
     fn primary(&self) -> ParseResult {
@@ -203,7 +199,7 @@ impl Parser {
         if self.is_match(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(&TokenType::RightParen, "expect ')' after expression.")?;
-            return Ok(Expr::new_grouping(&[expr]));
+            return Ok(Expr::new_grouping(&expr));
         }
 
         Err(ParseError::new(
@@ -233,5 +229,28 @@ impl Parser {
 
             self.advance();
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::ast_printer::*;
+
+    #[test]
+    fn test_parser() {
+        let p = Parser::new(&[
+            Token::new(TokenType::Number(5.0), "5", 1),
+            Token::new(TokenType::Equal, "=", 1),
+            Token::new(TokenType::Number(1.0), "1", 1),
+            Token::new(TokenType::Plus, "+", 1),
+            Token::new(TokenType::Number(9.0), "9", 1),
+            Token::new(TokenType::Minus, "-", 1),
+            Token::new(TokenType::Number(4.0), "4", 1),
+            Token::new(TokenType::EOF, "", 1),
+        ]);
+        let expr = p.parse().unwrap();
+        println!("{:?}", expr);
+        println!("{:?}", AstPrinter::serialize(expr));
     }
 }

@@ -1,36 +1,40 @@
 use crate::expr::*;
 
-pub fn serialize_ast(e: Expr) -> String {
-    format!("{}", parenthesize(&e))
-}
+pub struct AstPrinter {}
 
-fn parenthesize(e: &Expr) -> String {
-    let mut buf = String::new();
-    match e.etype {
-        ExprType::Binary => {
-            buf.push_str(&format!("({}", e.token.lexeme));
-            for c in &e.children {
-                buf.push_str(&format!(" {}", &parenthesize(&c)));
-            }
-            buf.push_str(")");
-        }
-        ExprType::Literal => {
-            buf.push_str(&format!("{}", e.token.lexeme));
-        }
-        ExprType::Unary => {
-            buf.push_str(&format!("({}", e.token.lexeme));
-            buf.push_str(&format!(" {})", parenthesize(&e.children[0])));
-        }
-        ExprType::Grouping => {
-            buf.push_str(&format!("(group"));
-            for c in &e.children {
-                buf.push_str(&format!(" {}", c.token.lexeme));
-            }
-            buf.push_str(&format!(")"));
-        }
+impl AstPrinter {
+    pub fn serialize(e: Expr) -> String {
+        format!("{}", Self::parenthesize(&e))
     }
 
-    buf
+    fn parenthesize(e: &Expr) -> String {
+        let mut buf = String::new();
+        match e.etype {
+            ExprType::Binary => {
+                buf.push_str(&format!("({}", e.token.lexeme));
+                for c in &e.children {
+                    buf.push_str(&format!(" {}", &Self::parenthesize(&c)));
+                }
+                buf.push_str(")");
+            }
+            ExprType::Literal => {
+                buf.push_str(&format!("{}", e.token.lexeme));
+            }
+            ExprType::Unary => {
+                buf.push_str(&format!("({}", e.token.lexeme));
+                buf.push_str(&format!(" {})", Self::parenthesize(&e.children[0])));
+            }
+            ExprType::Grouping => {
+                buf.push_str(&format!("(group"));
+                for c in &e.children {
+                    buf.push_str(&format!(" {}", c.token.lexeme));
+                }
+                buf.push_str(&format!(")"));
+            }
+        }
+
+        buf
+    }
 }
 
 #[cfg(test)]
@@ -46,7 +50,7 @@ mod test {
             Expr::new_literal(Token::new(TokenType::Number(1.0), "1", 1)),
             Expr::new_literal(Token::new(TokenType::Number(2.0), "2", 1)),
         );
-        assert_eq!(serialize_ast(e), "(* 1 2)");
+        assert_eq!(AstPrinter::serialize(e), "(* 1 2)");
 
         let e = Expr::new_binary(
             Token::new(TokenType::Star, "*", 1),
@@ -60,6 +64,6 @@ mod test {
                 1,
             ))]),
         );
-        assert_eq!(serialize_ast(e), "(* (- 123) (group 45.67))");
+        assert_eq!(AstPrinter::serialize(e), "(* (- 123) (group 45.67))");
     }
 }

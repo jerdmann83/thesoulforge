@@ -35,13 +35,13 @@ impl Expr {
         e
     }
 
-    pub fn new_grouping(exprs: &[Expr]) -> Expr {
+    pub fn new_grouping(expr: &Expr) -> Expr {
         let e = Expr {
             etype: ExprType::Grouping,
             // hack in a token type because I really don't want to deal with
             // token nullability in however many places these things appear
             token: Token::new(TokenType::EOF, "", 0),
-            children: exprs.to_vec(),
+            children: vec![expr.clone()],
         };
         e
     }

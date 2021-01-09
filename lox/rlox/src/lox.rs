@@ -1,6 +1,7 @@
 use std::io::{self, Read, Write};
 
 use crate::ast_printer::*;
+use crate::interpreter::*;
 use crate::parser::*;
 use crate::scanner::*;
 use crate::token::*;
@@ -9,27 +10,37 @@ use std::fs::File;
 
 pub struct Lox {
     had_error: bool,
+    had_runtime_error: bool,
 }
 
 impl Lox {
     pub fn new() -> Self {
-        Lox { had_error: false }
+        Lox {
+            had_error: false,
+            had_runtime_error: false,
+        }
     }
 
     pub fn run(&mut self, s: &str) {
         let sc = Scanner::new(s);
         let toks = &sc.scan_tokens();
-        // println!("tokens: {:?}", toks);
 
         let p = Parser::new(&toks);
         let expr = p.parse().unwrap();
+        let val = Interpreter::interpret(&expr);
 
-        if self.had_error {
-            todo!();
+        println!("ast: {}", AstPrinter::serialize(expr));
+        match val {
+            Ok(v) => println!("value: {:?}", v),
+            Err(e) => println!("error: {:?}", e),
         }
 
-        // println!("{:?}", expr);
-        println!("ast: {}", serialize_ast(expr));
+        // if self.had_error {
+        //     todo!();
+        // }
+        // if self.had_runtime_error {
+        //     todo!();
+        // }
     }
 
     pub fn run_prompt(&mut self) {
@@ -41,6 +52,7 @@ impl Lox {
             io::stdin().read_line(&mut buf).unwrap();
             self.run(&buf);
             self.had_error = false;
+            self.had_runtime_error = false;
         }
     }
 
