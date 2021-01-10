@@ -1,4 +1,6 @@
 use crate::expr::*;
+use crate::lox::*;
+use crate::stmt::*;
 use crate::token_type::*;
 use crate::value::*;
 
@@ -18,14 +20,37 @@ impl RuntimeError {
 }
 
 pub type InterpreterResult = Result<Value, RuntimeError>;
+pub type ExecuteResult = Result<(), RuntimeError>;
 
 pub struct Interpreter {
     //
 }
 
 impl Interpreter {
-    pub fn interpret(expr: &Expr) -> InterpreterResult {
-        Self::eval(&expr)
+    pub fn interpret(stmts: &Vec<Stmt>) -> InterpreterResult {
+        for stmt in stmts {
+            match Self::execute(&stmt) {
+                _ => {}
+                Err(n) => {
+                    Lox::runtime_error(&n.msg);
+                    return Err(n);
+                }
+            }
+        }
+        Ok(Value::Number(99.))
+    }
+
+    pub fn execute(stmt: &Stmt) -> ExecuteResult {
+        Ok(())
+    }
+
+    pub fn eval_stmt(stmt: &Stmt) {
+        match stmt {
+            Stmt::Expr(expr) => {
+                Self::eval(&expr);
+            }
+            _ => todo!(),
+        }
     }
 
     fn eval(expr: &Expr) -> InterpreterResult {

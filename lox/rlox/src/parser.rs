@@ -1,5 +1,6 @@
 use crate::expr::*;
 use crate::lox::*;
+use crate::stmt::*;
 use crate::token::*;
 use crate::token_type::*;
 use std::cell::RefCell;
@@ -17,7 +18,11 @@ impl ParseError {
     }
 }
 
-pub type ParseResult = Result<Expr, ParseError>;
+pub type ParseResult = Result<Vec<Stmt>, ParseError>;
+
+type StmtResult = Result<Stmt, ParseError>;
+type ExprResult = Result<Expr, ParseError>;
+
 type ConsumeResult = Result<(), ParseError>;
 
 #[derive(Debug)]
@@ -35,7 +40,12 @@ impl Parser {
     }
 
     pub fn parse(&self) -> ParseResult {
-        self.expression()
+        let mut stmts = vec![];
+        while !self.is_at_end() {
+            stmts.push(self.statement()?);
+        }
+
+        Ok(stmts)
     }
 
     fn is_match(&self, tts: &[TokenType]) -> bool {
@@ -97,6 +107,25 @@ impl Parser {
         self.peek().ttype == TokenType::EOF
     }
 
+    fn statement(&self) -> StmtResult {
+        if self.is_match(&[TokenType::Print]) {
+            return self.print_stmt();
+        }
+        return self.expr_stmt();
+    }
+
+    fn print_stmt(&self) -> StmtResult {
+        let val = self.expression()?;
+        self.consume(&TokenType::Semicolon, "expect ';' after value")?;
+        return Ok(Stmt::new_print(&val));
+    }
+
+    fn expr_stmt(&self) -> StmtResult {
+        let expr = self.expression()?;
+        self.consume(&TokenType::Semicolon, "expect ';' after statement")?;
+        return Ok(Stmt::new_print(&expr));
+    }
+
     /// grammar rules:
     /// expression     -> equality ;
     /// equality       -> comparison ( ( "!=" | "==" ) comparison )* ;
@@ -108,11 +137,11 @@ impl Parser {
     /// primary        -> NUMBER | STRING | "true" | "false" | "nil"
     ///                | "(" expression ")" ;
 
-    fn expression(&self) -> ParseResult {
+    fn expression(&self) -> ExprResult {
         self.equality()
     }
 
-    fn equality(&self) -> ParseResult {
+    fn equality(&self) -> ExprResult {
         let mut expr = self.comparison()?;
 
         while self.is_match(&[TokenType::BangEqual, TokenType::Equal]) {
@@ -124,7 +153,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn comparison(&self) -> ParseResult {
+    fn comparison(&self) -> ExprResult {
         let mut expr = self.term()?;
         // println!("comparison: {:?}", expr);
 
@@ -142,7 +171,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn term(&self) -> ParseResult {
+    fn term(&self) -> ExprResult {
         let mut expr = self.factor()?;
         // println!("term: {:?}", expr);
 
@@ -155,7 +184,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn factor(&self) -> ParseResult {
+    fn factor(&self) -> ExprResult {
         let mut expr = self.unary()?;
         // println!("factor: {:?}", expr);
 
@@ -169,7 +198,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn unary(&self) -> ParseResult {
+    fn unary(&self) -> ExprResult {
         while self.is_match(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary()?;
@@ -179,7 +208,7 @@ impl Parser {
         self.primary()
     }
 
-    fn primary(&self) -> ParseResult {
+    fn primary(&self) -> ExprResult {
         if self.is_match(&[TokenType::False]) {
             return Ok(Expr::new_literal(self.previous()));
         }

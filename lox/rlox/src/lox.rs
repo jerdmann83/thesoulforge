@@ -1,6 +1,5 @@
 use std::io::{self, Read, Write};
 
-use crate::ast_printer::*;
 use crate::interpreter::*;
 use crate::parser::*;
 use crate::scanner::*;
@@ -26,10 +25,14 @@ impl Lox {
         let toks = &sc.scan_tokens();
 
         let p = Parser::new(&toks);
-        let expr = p.parse().unwrap();
-        let val = Interpreter::interpret(&expr);
+        let expr = p.parse();
+        if expr.is_err() {
+            return;
+        }
 
-        println!("ast: {}", AstPrinter::serialize(expr));
+        let val = Interpreter::interpret(&expr.unwrap());
+
+        // println!("ast: {}", AstPrinter::serialize(expr));
         match val {
             Ok(v) => println!("value: {:?}", v),
             Err(e) => println!("error: {:?}", e),
@@ -68,6 +71,10 @@ impl Lox {
 
     pub fn error(line: usize, msg: &str) {
         Lox::report(line, "", msg);
+    }
+
+    pub fn runtime_error(msg: &str) {
+        Lox::report(0, "", msg);
     }
 
     pub fn report(line: usize, loc: &str, msg: &str) {
