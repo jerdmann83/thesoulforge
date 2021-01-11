@@ -3,8 +3,8 @@ use crate::expr::*;
 pub struct AstPrinter {}
 
 impl AstPrinter {
-    pub fn serialize(e: Expr) -> String {
-        format!("{}", Self::parenthesize(&e))
+    pub fn serialize(e: &Expr) -> String {
+        format!("{}", Self::parenthesize(e))
     }
 
     fn parenthesize(e: &Expr) -> String {
@@ -31,6 +31,7 @@ impl AstPrinter {
                 }
                 buf.push_str(&format!(")"));
             }
+            _ => todo!(),
         }
 
         buf
@@ -50,7 +51,7 @@ mod test {
             Expr::new_literal(Token::new(TokenType::Number(1.0), "1", 1)),
             Expr::new_literal(Token::new(TokenType::Number(2.0), "2", 1)),
         );
-        assert_eq!(AstPrinter::serialize(e), "(* 1 2)");
+        assert_eq!(AstPrinter::serialize(&e), "(* 1 2)");
 
         let e = Expr::new_binary(
             Token::new(TokenType::Star, "*", 1),
@@ -58,12 +59,12 @@ mod test {
                 Token::new(TokenType::Minus, "-", 1),
                 Expr::new_literal(Token::new(TokenType::Number(123.0), "123", 1)),
             ),
-            Expr::new_grouping(&vec![Expr::new_literal(Token::new(
+            Expr::new_grouping(&Expr::new_literal(Token::new(
                 TokenType::Number(45.67),
                 "45.67",
                 1,
-            ))]),
+            ))),
         );
-        assert_eq!(AstPrinter::serialize(e), "(* (- 123) (group 45.67))");
+        assert_eq!(AstPrinter::serialize(&e), "(* (- 123) (group 45.67))");
     }
 }

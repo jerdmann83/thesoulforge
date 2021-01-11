@@ -1,69 +1,74 @@
+use crate::environment::*;
+use crate::error::*;
 use crate::expr::*;
 use crate::lox::*;
 use crate::stmt::*;
+use crate::token::*;
 use crate::token_type::*;
 use crate::value::*;
 
-#[derive(Debug)]
-pub struct RuntimeError {
-    msg: String,
-    line: usize,
-}
-
-impl RuntimeError {
-    fn new(msg: &str, line: usize) -> Self {
-        Self {
-            msg: msg.to_string(),
-            line: line,
-        }
-    }
-}
+use std::cell::RefCell;
 
 pub type InterpreterResult = Result<Value, RuntimeError>;
 pub type ExecuteResult = Result<(), RuntimeError>;
 
 pub struct Interpreter {
-    //
+    env: RefCell<Environment>,
 }
 
 impl Interpreter {
-    pub fn interpret(stmts: &Vec<Stmt>) -> InterpreterResult {
+    pub fn new() -> Self {
+        Interpreter {
+            env: RefCell::new(Environment::new()),
+        }
+    }
+
+    pub fn interpret(&self, stmts: &Vec<Stmt>) -> ExecuteResult {
         for stmt in stmts {
-            match Self::execute(&stmt) {
-                _ => {}
+            match self.execute(&stmt) {
                 Err(n) => {
                     Lox::runtime_error(&n.msg);
                     return Err(n);
                 }
+                _ => {}
             }
         }
-        Ok(Value::Number(99.))
-    }
-
-    pub fn execute(stmt: &Stmt) -> ExecuteResult {
         Ok(())
     }
 
-    pub fn eval_stmt(stmt: &Stmt) {
+    pub fn execute(&self, stmt: &Stmt) -> ExecuteResult {
+        self.eval_stmt(&stmt)
+    }
+
+    pub fn eval_stmt(&self, stmt: &Stmt) -> ExecuteResult {
         match stmt {
             Stmt::Expr(expr) => {
-                Self::eval(&expr);
+                let _ = self.eval(&expr)?;
             }
-            _ => todo!(),
+            Stmt::Var(token, expr) => self.eval_var(&token, &expr)?,
+            Stmt::Print(expr) => self.eval_print(&expr)?,
         }
+        Ok(())
     }
 
-    fn eval(expr: &Expr) -> InterpreterResult {
+    fn eval(&self, expr: &Expr) -> InterpreterResult {
         match expr.etype {
-            ExprType::Grouping => return Self::eval(&expr.children[0]),
-            ExprType::Literal => return Self::eval_literal(&expr),
-            ExprType::Binary => return Self::eval_binary(&expr),
-            ExprType::Unary => return Self::eval_unary(&expr),
+            ExprType::Grouping => return self.eval(&expr.children[0]),
+            ExprType::Literal => return self.eval_literal(&expr),
+            ExprType::Binary => return self.eval_binary(&expr),
+            ExprType::Unary => return self.eval_unary(&expr),
+            ExprType::Variable => {
+                let env = self.env.borrow();
+                let name = &expr.token.lexeme;
+                match env.get(name) {
+                    Ok(v) => return Ok(v),
+                    Err(e) => return Err(RuntimeError::new(&e.msg, 0)),
+                }
+            }
         }
-        //
     }
 
-    fn eval_literal(expr: &Expr) -> InterpreterResult {
+    fn eval_literal(&self, expr: &Expr) -> InterpreterResult {
         match &expr.token.ttype {
             TokenType::String(s) => return Ok(Value::String(s.to_string())),
             TokenType::Number(n) => return Ok(Value::Number(*n)),
@@ -78,9 +83,9 @@ impl Interpreter {
         }
     }
 
-    fn eval_binary(expr: &Expr) -> InterpreterResult {
-        let left = Self::eval(&expr.children[0])?;
-        let right = Self::eval(&expr.children[1])?;
+    fn eval_binary(&self, expr: &Expr) -> InterpreterResult {
+        let left = self.eval(&expr.children[0])?;
+        let right = self.eval(&expr.children[1])?;
         if let (Value::Number(ln), Value::Number(rn)) = (&left, &right) {
             match expr.token.ttype {
                 TokenType::Minus => return Ok(Value::Number(ln - rn)),
@@ -125,8 +130,8 @@ impl Interpreter {
         ))
     }
 
-    fn eval_unary(expr: &Expr) -> InterpreterResult {
-        let right = Self::eval(&expr.children[0])?;
+    fn eval_unary(&self, expr: &Expr) -> InterpreterResult {
+        let right = self.eval(&expr.children[0])?;
         if let Value::Number(n) = right {
             match expr.token.ttype {
                 TokenType::Minus => return Ok(Value::Number(-n)),
@@ -144,6 +149,22 @@ impl Interpreter {
             &format!("unhandled {:?}", right),
             expr.token.line,
         ));
+    }
+
+    fn eval_var(&self, tok: &Token, initializer: &Option<Expr>) -> ExecuteResult {
+        let mut val = Value::Nil;
+        if let Some(expr) = initializer {
+            val = self.eval(expr)?;
+        }
+        let mut env = self.env.borrow_mut();
+        env.define(&tok.lexeme, &val);
+        Ok(())
+    }
+
+    fn eval_print(&self, expr: &Expr) -> ExecuteResult {
+        let val = self.eval(&expr)?;
+        println!("{}", val);
+        Ok(())
     }
 
     fn is_truthy(val: &Value) -> bool {

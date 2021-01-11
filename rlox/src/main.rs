@@ -1,6 +1,8 @@
 use std::{env, process};
 
 mod ast_printer;
+mod environment;
+mod error;
 mod expr;
 mod interpreter;
 mod lox;

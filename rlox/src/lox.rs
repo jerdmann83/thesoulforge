@@ -30,11 +30,12 @@ impl Lox {
             return;
         }
 
-        let val = Interpreter::interpret(&expr.unwrap());
+        let mut ir = Interpreter::new();
+        let val = ir.interpret(&expr.unwrap());
 
         // println!("ast: {}", AstPrinter::serialize(expr));
         match val {
-            Ok(v) => println!("value: {:?}", v),
+            Ok(_) => {},
             Err(e) => println!("error: {:?}", e),
         }
 
@@ -78,7 +79,7 @@ impl Lox {
     }
 
     pub fn report(line: usize, loc: &str, msg: &str) {
-        eprintln!("[line {} Error{}: {}", line, loc, msg);
+        eprintln!("[line {}] error{}: {}", line, loc, msg);
     }
 
     pub fn token_error(t: Token, msg: &str) {

@@ -42,7 +42,13 @@ impl Parser {
     pub fn parse(&self) -> ParseResult {
         let mut stmts = vec![];
         while !self.is_at_end() {
-            stmts.push(self.statement()?);
+            match self.declaration() {
+                Ok(stmt)  => stmts.push(stmt),
+                Err(e) => {
+                    self.error(&self.previous(), &e.msg);
+                    return Err(e);
+                }
+            }
         }
 
         Ok(stmts)
@@ -105,6 +111,39 @@ impl Parser {
     fn is_at_end(&self) -> bool {
         assert!(*self.current.borrow() < self.tokens.len());
         self.peek().ttype == TokenType::EOF
+    }
+
+    fn declaration(&self) -> StmtResult {
+        if self.is_match(&[TokenType::Var]) {
+            return self.var_declaration();
+        }
+
+        match self.statement() {
+            Ok(stmt) => return Ok(stmt),
+            Err(err) => {
+                self.synchronize();
+                return Err(err);
+            }
+        }
+    }
+
+    fn var_declaration(&self) -> StmtResult {
+        self.consume(
+            &TokenType::Identifier(String::new()),
+            "expect variable name",
+        )?;
+        let tok = self.previous();
+
+        if !self.is_match(&[TokenType::Equal]) {
+            return Err(ParseError::new(&format!("expect '=' after '{:?}'", tok)));
+        }
+
+        let initializer = self.expression()?;
+        self.consume(
+            &TokenType::Semicolon,
+            "expect ';' after variable declaration",
+        )?;
+        return Ok(Stmt::new_var_init(&tok, &initializer));
     }
 
     fn statement(&self) -> StmtResult {
@@ -231,6 +270,10 @@ impl Parser {
             return Ok(Expr::new_grouping(&expr));
         }
 
+        if self.is_match(&[TokenType::Identifier(String::new())]) {
+            return Ok(Expr::new_var(self.previous()));
+        }
+
         Err(ParseError::new(
             &format!("no rule for expression '{:?}'", self.peek()).to_string(),
         ))
@@ -278,8 +321,9 @@ mod test {
             Token::new(TokenType::Number(4.0), "4", 1),
             Token::new(TokenType::EOF, "", 1),
         ]);
-        let expr = p.parse().unwrap();
-        println!("{:?}", expr);
-        println!("{:?}", AstPrinter::serialize(expr));
+        // let stmts = p.parse().unwrap();
+        // for stmt in stmts {
+        //     println!("{:?}", AstPrinter::serialize(&stmt.expr));
+        // }
     }
 }
