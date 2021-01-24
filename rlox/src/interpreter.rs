@@ -54,6 +54,7 @@ impl Interpreter {
     fn eval(&self, expr: &Expr) -> InterpreterResult {
         match expr.etype {
             ExprType::Grouping => return self.eval(&expr.children[0]),
+            ExprType::Assign => return self.eval_assign(&expr),
             ExprType::Literal => return self.eval_literal(&expr),
             ExprType::Binary => return self.eval_binary(&expr),
             ExprType::Unary => return self.eval_unary(&expr),
@@ -68,12 +69,20 @@ impl Interpreter {
         }
     }
 
+    fn eval_assign(&self, expr: &Expr) -> InterpreterResult {
+        let val = self.eval(&expr.children[0])?;
+        let mut env = self.env.borrow_mut();
+        env.assign(&expr.token.lexeme, &val)?;
+        Ok(val)
+    }
+
     fn eval_literal(&self, expr: &Expr) -> InterpreterResult {
         match &expr.token.ttype {
             TokenType::String(s) => return Ok(Value::String(s.to_string())),
             TokenType::Number(n) => return Ok(Value::Number(*n)),
             TokenType::True => return Ok(Value::Bool(true)),
             TokenType::False => return Ok(Value::Bool(false)),
+            TokenType::Nil => return Ok(Value::Nil),
             _ => {
                 return Err(RuntimeError::new(
                     &format!("unhandled literal {:?}", expr.token.lexeme),
@@ -99,7 +108,10 @@ impl Interpreter {
                 TokenType::LessEqual => return Ok(Value::Bool(ln <= rn)),
                 _ => {
                     return Err(RuntimeError::new(
-                        &format!("unexpected binary arguments {:?} and {:?}", left, right),
+                        &format!(
+                            "unexpected operator {} for binary arguments {:?} and {:?}",
+                            expr.token.lexeme, left, right
+                        ),
                         expr.token.line,
                     ))
                 }

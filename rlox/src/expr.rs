@@ -1,8 +1,9 @@
 use crate::token::*;
 use crate::token_type::*;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ExprType {
+    Assign,
     Binary,
     Unary,
     Grouping,
@@ -17,25 +18,16 @@ pub struct Expr {
     pub children: Vec<Expr>,
 }
 
-/// expression grammar
-/// expression     → literal
-///                | unary
-///                | binary
-///                | grouping ;
-///
-/// literal        → NUMBER | STRING | "true" | "false" | "nil" ;
-/// grouping       → "(" expression ")" ;
-/// unary          → ( "-" | "!" ) expression ;
-/// binary         → expression operator expression ;
-/// operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
-///                | "+"  | "-"  | "*" | "/" ;
-///
-/// primary        → "true" | "false" | "nil"
-///               | NUMBER | STRING
-///               | "(" expression ")"
-///               | IDENTIFIER ;
-
 impl Expr {
+    pub fn new_assign(token: Token, val: Expr) -> Expr {
+        let e = Expr {
+            etype: ExprType::Assign,
+            token: token,
+            children: vec![val],
+        };
+        e
+    }
+
     pub fn new_binary(token: Token, left: Expr, right: Expr) -> Expr {
         let e = Expr {
             etype: ExprType::Binary,

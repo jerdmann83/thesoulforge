@@ -1,10 +1,25 @@
 use crate::expr::*;
+use crate::lox::*;
+use crate::stmt::*;
 
 pub struct AstPrinter {}
 
 impl AstPrinter {
     pub fn serialize(e: &Expr) -> String {
         format!("{}", Self::parenthesize(e))
+    }
+
+    pub fn serialize_stmts(stmts: &Vec<Stmt>) -> String {
+        let mut buf = String::new();
+        for stmt in stmts {
+            println!("{:?}", stmt);
+            match stmt {
+                Stmt::Expr(expr) => buf.push_str(&Self::parenthesize(expr)),
+                Stmt::Print(expr) => {}
+                _ => {}
+            }
+        }
+        buf
     }
 
     fn parenthesize(e: &Expr) -> String {
@@ -31,7 +46,10 @@ impl AstPrinter {
                 }
                 buf.push_str(&format!(")"));
             }
-            _ => todo!(),
+            ExprType::Variable => {
+                buf.push_str(&format!("{}", e.token.lexeme));
+            }
+            _ => {} //  todo!()
         }
 
         buf

@@ -1,5 +1,6 @@
 use std::io::{self, Read, Write};
 
+use crate::ast_printer::*;
 use crate::interpreter::*;
 use crate::parser::*;
 use crate::scanner::*;
@@ -29,13 +30,14 @@ impl Lox {
         if expr.is_err() {
             return;
         }
+        let expr = expr.unwrap();
 
         let mut ir = Interpreter::new();
-        let val = ir.interpret(&expr.unwrap());
+        let val = ir.interpret(&expr);
 
-        // println!("ast: {}", AstPrinter::serialize(expr));
+        println!("ast: {}", AstPrinter::serialize_stmts(&expr));
         match val {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(e) => println!("error: {:?}", e),
         }
 

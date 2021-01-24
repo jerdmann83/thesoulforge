@@ -43,7 +43,7 @@ impl Parser {
         let mut stmts = vec![];
         while !self.is_at_end() {
             match self.declaration() {
-                Ok(stmt)  => stmts.push(stmt),
+                Ok(stmt) => stmts.push(stmt),
                 Err(e) => {
                     self.error(&self.previous(), &e.msg);
                     return Err(e);
@@ -79,6 +79,7 @@ impl Parser {
         }
 
         let cur = self.peek().ttype;
+
         let out = std::mem::discriminant(&cur) == std::mem::discriminant(&tt);
         out
     }
@@ -134,6 +135,10 @@ impl Parser {
         )?;
         let tok = self.previous();
 
+        if self.is_match(&[TokenType::Semicolon]) {
+            return Ok(Stmt::new_var(&tok));
+        }
+
         if !self.is_match(&[TokenType::Equal]) {
             return Err(ParseError::new(&format!("expect '=' after '{:?}'", tok)));
         }
@@ -148,6 +153,7 @@ impl Parser {
 
     fn statement(&self) -> StmtResult {
         if self.is_match(&[TokenType::Print]) {
+            println!("{:?}", self.previous());
             return self.print_stmt();
         }
         return self.expr_stmt();
@@ -162,28 +168,35 @@ impl Parser {
     fn expr_stmt(&self) -> StmtResult {
         let expr = self.expression()?;
         self.consume(&TokenType::Semicolon, "expect ';' after statement")?;
-        return Ok(Stmt::new_print(&expr));
+        return Ok(Stmt::new_expr(&expr));
     }
 
-    /// grammar rules:
-    /// expression     -> equality ;
-    /// equality       -> comparison ( ( "!=" | "==" ) comparison )* ;
-    /// comparison     -> term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-    /// term           -> factor ( ( "-" | "+" ) factor )* ;
-    /// factor         -> unary ( ( "/" | "*" ) unary )* ;
-    /// unary          -> ( "!" | "-" ) unary
-    ///                | primary ;
-    /// primary        -> NUMBER | STRING | "true" | "false" | "nil"
-    ///                | "(" expression ")" ;
-
     fn expression(&self) -> ExprResult {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&self) -> ExprResult {
+        let expr = self.equality()?;
+
+        if self.is_match(&[TokenType::Equal]) {
+            let equals = self.previous();
+            let val = self.assignment()?;
+
+            if expr.etype == ExprType::Variable {
+                let name = expr.token;
+                return Ok(Expr::new_assign(name, val));
+            }
+
+            self.error(&equals, "invalid assignment target");
+        }
+
+        Ok(expr)
     }
 
     fn equality(&self) -> ExprResult {
         let mut expr = self.comparison()?;
 
-        while self.is_match(&[TokenType::BangEqual, TokenType::Equal]) {
+        while self.is_match(&[TokenType::BangEqual, TokenType::EqualEqual]) {
             let operator = self.previous();
             let right = self.comparison()?;
             expr = Expr::new_binary(operator, expr, right);
