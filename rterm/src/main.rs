@@ -1,28 +1,30 @@
-extern crate rustbox;
+extern crate clap;
 extern crate log;
+extern crate rustbox;
 
-use std::error::Error;
-
-use rustbox::{Color, RustBox};
-use rustbox::{InitOptions, Key};
-use std::time::Duration;
-use std::thread::sleep;
 use log::LevelFilter;
 use rand::Rng;
+use rustbox::{Color, RustBox};
+use rustbox::{InitOptions, Key};
+use std::thread::sleep;
+use std::time::Duration;
+use std::time::SystemTime;
 
-use std::time::{SystemTime};
+use clap::{App, Arg};
 
 fn scroll_colors(rustbox: RustBox) {
-    let mut cur: u16 = 0;
+    const COLOR_MAX: i32 = 255;
+    let mut cur: i32 = 0;
     let mut done = false;
     while !done {
         for col in 0..rustbox.height() {
-            let color = cur + col as u16;
+            let mut color = cur as u32 + col as u32;
+            color = color % COLOR_MAX as u32;
             rustbox.print(
                 0,
                 col,
                 rustbox::RB_BOLD,
-                Color::Byte(color),
+                Color::Byte(color as u16),
                 Color::Black,
                 &format!("{:8}: {:0>8b}", color, color),
             );
@@ -36,11 +38,11 @@ fn scroll_colors(rustbox: RustBox) {
                         break;
                     }
                     Key::Char('n') => {
-                        cur += rustbox.height() as u16;
+                        cur += rustbox.height() as i32;
                         break;
                     }
                     Key::Char('p') => {
-                        cur -= rustbox.height() as u16;
+                        cur -= rustbox.height() as i32;
                         break;
                     }
                     Key::Char('j') => {
@@ -53,90 +55,78 @@ fn scroll_colors(rustbox: RustBox) {
                     }
                     _ => {}
                 },
-                Err(e) => panic!("{}", e.description()),
+                Err(e) => panic!("{}", e.to_string()),
                 _ => {}
             }
+        }
+
+        if cur < 0 {
+            cur = COLOR_MAX;
+        } else if cur > COLOR_MAX {
+            cur = 0;
         }
     }
 }
 
-struct HeatMap {
-    grid: Vec<Vec<f32>>,
-}
-
-impl HeatMap {
-    fn new(width: usize, height: usize) -> Self {
-        let grid: Vec<Vec<f32>> = vec![vec![]];
-        HeatMap{grid: grid}
-
-    }
-}
-
 fn get_heat_color(heat: f32) -> u16 {
-    let mut vals: Vec<u16> = vec![
-        124,
-        160,
-        196,
-        202,
-        208,
-        214,
-        220,
-        226,
-        0,
-        ];
+    let mut vals: Vec<u16> = vec![124, 160, 196, 202, 208, 214, 220, 226, 0];
     vals.reverse();
 
-    // normalize 0.0 - 1.0 into an index into the above values 
-    let mut idx  = (heat * (vals.len() as f32 + 0.05)) as usize;
+    // normalize 0.0 - 1.0 into an index into the above values
+    let mut idx = (heat * (vals.len() as f32 + 0.05)) as usize;
     if idx >= vals.len() {
         idx = vals.len() - 1;
     }
     vals[idx]
 }
 
-// positive bump means widen the range, negative narrows
-// hey, that last bit is even alliterative!
-//
 // TODO: really want to make this generic, but to do so I apparantly need to
-// bring in the num-traits crate?  too lazy for now...
-fn widen_range(range: &mut std::ops::Range<f32>, bump: f32) {
-    if range.end - range.start <= bump {
-        return;
-    }
+// bring in the num-traits crate?  Getting some headache-inducing compile errors
+// so will revisit...
+fn bump_range(range: &mut std::ops::Range<f32>, bump: f32) {
     range.start += bump;
-    range.end   -= bump;
+    range.end += bump;
 }
 
 struct FireBox {
     rustbox: RustBox,
     grid: Vec<Vec<f32>>,
+    // percent range that a given heat cell will move to another cell
+    // 0.0 is no chance and >=1.0 is perfect chance, eg zero loss/decay
     heat_transfer: std::ops::Range<f32>,
     wind: f32,
 }
 
 impl FireBox {
     fn new(rustbox: RustBox) -> Self {
-        FireBox{
+        FireBox {
             rustbox: rustbox,
             grid: vec![],
-            heat_transfer: 0.6..0.9,
+            heat_transfer: 0.85..0.95,
             wind: 0.0,
         }
-
     }
+
+    fn make_heat_source(width: usize) -> Vec<f32> {
+        let mut heat_source = vec![1.0; width];
+        let srclen = heat_source.len();
+        for i in 0..(width as f32 * 0.1) as usize {
+            heat_source[i] = 0.0;
+            heat_source[srclen - 1 - i] = 0.0;
+        }
+        heat_source
+    }
+
+    // 50 * 0.8
 
     // ridiculous rust practice exercise inspired by:
     // https://fabiensanglard.net/doom_fire_psx/
     fn run(&mut self) {
-        let mut heat_source = vec![1.0; self.rustbox.width()];
-        let srclen = heat_source.len();
-        for i in 0..(self.rustbox.width() as f32 * 0.1) as usize {
-            heat_source[i] = 0.0;
-            heat_source[srclen-1-i] = 0.0;
-        }
-        self.grid.push(heat_source);
-        for _ in 1..self.rustbox.height() {
-            self.grid.push(vec![0 as f32; self.rustbox.width()]);
+        let width = self.rustbox.width();
+        let height = self.rustbox.height();
+        self.grid.push(Self::make_heat_source(width));
+        for _ in 1..height {
+            self.grid.push(vec![0 as f32; width]);
         }
 
         let mut rng = rand::thread_rng();
@@ -144,15 +134,10 @@ impl FireBox {
             log::info!("enter");
             for y in (1..self.grid.len()).rev() {
                 for x in 0..self.grid[y].len() {
-                    let src_y = y-1;
-                    let mut src_x : i64 = x as i64;
-                    let mut seed = rng.gen_range(0.0..1.0);
-                    seed += self.wind;
-                    if seed < 0.1 {
-                        src_x -= 1;
-                    } else if seed > 0.9 {
-                        src_x += 1;
-                    }
+                    let src_y = y - 1;
+                    let mut src_x: i64 = x as i64;
+                    let wind = self.wind + rng.gen_range(-1.2..1.2);
+                    src_x += wind as i64;
                     if src_x < 0 || src_x >= self.grid[y].len() as i64 {
                         continue;
                     }
@@ -172,7 +157,8 @@ impl FireBox {
                         rustbox::RB_BOLD,
                         Color::Byte(get_heat_color(heat)),
                         Color::Byte(get_heat_color(heat)),
-                        " ");
+                        " ",
+                    );
                 }
             }
 
@@ -184,28 +170,38 @@ impl FireBox {
                 rustbox::RB_BOLD,
                 Color::Black,
                 Color::Black,
-                &" ".repeat(self.rustbox.width() - ui.len()));
+                &" ".repeat(width - ui.len()),
+            );
             // ...and draw the (lame) ui itself
             self.rustbox.print(
-                self.rustbox.width() - ui.len(),
+                width - ui.len(),
                 0,
                 rustbox::RB_BOLD,
                 Color::White,
                 Color::Black,
-                &ui);
+                &ui,
+            );
 
             log::info!("spread complete");
             self.rustbox.present();
 
-            const WIND_TICK : f32 = 0.05;
-            const HEAT_XFER_TICK : f32 = 0.01;
-            const TIMEOUT_MS : u64 = 30;
+            const WIND_TICK: f32 = 0.5;
+            const HEAT_XFER_TICK: f32 = 0.01;
+            const TIMEOUT_MS: u64 = 30;
             let ts_start = SystemTime::now();
             let timeout = Duration::from_millis(TIMEOUT_MS);
             match self.rustbox.peek_event(timeout, false) {
                 Ok(rustbox::Event::KeyEvent(key)) => match key {
                     Key::Char('q') => {
                         break;
+                    }
+                    Key::Char(' ') => {
+                        // space toggles the heat source
+                        if self.grid[0][width / 2] > 0.0 {
+                            self.grid[0] = vec![0.0; width];
+                        } else {
+                            self.grid[0] = Self::make_heat_source(width);
+                        }
                     }
                     Key::Char('h') => {
                         self.wind += WIND_TICK;
@@ -214,10 +210,10 @@ impl FireBox {
                         self.wind -= WIND_TICK;
                     }
                     Key::Char('k') => {
-                        widen_range(&mut self.heat_transfer, HEAT_XFER_TICK);
+                        bump_range(&mut self.heat_transfer, HEAT_XFER_TICK);
                     }
                     Key::Char('j') => {
-                        widen_range(&mut self.heat_transfer, -HEAT_XFER_TICK);
+                        bump_range(&mut self.heat_transfer, -HEAT_XFER_TICK);
                     }
                     _ => {}
                 },
@@ -240,7 +236,49 @@ impl FireBox {
     }
 }
 
+enum Mode {
+    Colors,
+    Firebox,
+}
+
+fn mode_to_string(mode: Mode) -> String {
+    match mode {
+        Mode::Colors => "colors".to_string(),
+        Mode::Firebox => "firebox".to_string(),
+    }
+}
+
+fn is_selected(matches: &clap::ArgMatches, mode: Mode) -> bool {
+    matches.occurrences_of(mode_to_string(mode)) > 0
+}
+
 fn main() {
+    let matches = App::new("rterm")
+        .version("1.0")
+        .about("various terminal practice things of dubious usefulness")
+        .arg(
+            Arg::with_name("firebox")
+                .long("firebox")
+                .help("pretty fire simulation thing"),
+        )
+        .arg(
+            Arg::with_name("colors")
+                .long("colors")
+                .help("scrollable colors viewer"),
+        )
+        .get_matches();
+
+    let mut modes = 0;
+    if is_selected(&matches, Mode::Firebox) {
+        modes += 1;
+    }
+    if is_selected(&matches, Mode::Colors) {
+        modes += 1;
+    }
+    if modes != 1 {
+        panic!("must select exactly one mode");
+    }
+
     simple_logging::log_to_file("/tmp/rustbox", LevelFilter::Info).unwrap();
 
     let opt = InitOptions {
@@ -253,7 +291,10 @@ fn main() {
         Result::Err(e) => panic!("{}", e),
     };
 
-    let mut fb = FireBox::new(rustbox);
-    fb.run();
-    // scroll_colors(rustbox)
+    if is_selected(&matches, Mode::Firebox) {
+        let mut fb = FireBox::new(rustbox);
+        fb.run();
+    } else if is_selected(&matches, Mode::Colors) {
+        scroll_colors(rustbox)
+    }
 }
