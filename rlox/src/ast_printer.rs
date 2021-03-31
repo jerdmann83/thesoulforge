@@ -12,7 +12,7 @@ impl AstPrinter {
     pub fn serialize_stmts(stmts: &Vec<Stmt>) -> String {
         let mut buf = String::new();
         for stmt in stmts {
-            println!("{:?}", stmt);
+            println!("{}", stmt);
             match stmt {
                 Stmt::Expr(expr) => buf.push_str(&Self::parenthesize(expr)),
                 Stmt::Print(expr) => {}

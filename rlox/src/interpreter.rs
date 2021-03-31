@@ -61,7 +61,7 @@ impl Interpreter {
             ExprType::Variable => {
                 let env = self.env.borrow();
                 let name = &expr.token.lexeme;
-                match env.get(name) {
+                match env.get(name, &expr.token.line) {
                     Ok(v) => return Ok(v),
                     Err(e) => return Err(RuntimeError::new(&e.msg, 0)),
                 }
@@ -72,7 +72,7 @@ impl Interpreter {
     fn eval_assign(&self, expr: &Expr) -> InterpreterResult {
         let val = self.eval(&expr.children[0])?;
         let mut env = self.env.borrow_mut();
-        env.assign(&expr.token.lexeme, &val)?;
+        env.assign(&expr.token.lexeme, &val, &expr.token.line)?;
         Ok(val)
     }
 

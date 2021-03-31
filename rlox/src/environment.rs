@@ -26,30 +26,30 @@ impl Environment {
         self.values.insert(name.to_string(), val.clone());
     }
 
-    pub fn assign(&mut self, name: &str, val: &Value) -> Result<(), RuntimeError> {
-        if self.values.contains_key(name) {
-        return Err(RuntimeError::new(
-            &format!("undefined variable '{}'", name),
-            0));
+    pub fn assign(&mut self, name: &str, val: &Value, line: &usize) -> Result<(), RuntimeError> {
+        if !self.values.contains_key(name) {
+            return Err(RuntimeError::new(
+                &format!("undefined variable '{}'", name),
+                *line,
+            ));
         }
 
         self.values.insert(name.to_string(), val.clone());
-        println!("{} {}", name, val);
         Ok(())
     }
 
-    pub fn get(&self, name: &str) -> Result<Value, RuntimeError> {
+    pub fn get(&self, name: &str, line: &usize) -> Result<Value, RuntimeError> {
         if let Some(val) = self.values.get(name) {
             return Ok(val.clone());
         }
 
         if let Some(enc) = &self.enclosing {
-            return enc.get(name);
+            return enc.get(name, line);
         }
 
         Err(RuntimeError::new(
             &format!("undefined variable '{}'", name),
-            0,
+            *line,
         ))
     }
     //

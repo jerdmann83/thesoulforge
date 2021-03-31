@@ -1,5 +1,6 @@
 use crate::token::*;
 use crate::token_type::*;
+use std::fmt;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ExprType {
@@ -16,6 +17,17 @@ pub struct Expr {
     pub etype: ExprType,
     pub token: Token,
     pub children: Vec<Expr>,
+}
+
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut buf = String::new();
+        buf.push_str(&format!("type:{:?} children:", self.etype));
+        for c in &self.children {
+            buf.push_str(&format!("{}", c));
+        }
+        write!(f, "{}", buf)
+    }
 }
 
 impl Expr {

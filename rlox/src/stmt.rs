@@ -1,5 +1,6 @@
 use crate::expr::*;
 use crate::token::*;
+use std::fmt;
 
 /// statement grammar
 /// program        → declaration* EOF ;
@@ -33,5 +34,21 @@ impl Stmt {
 
     pub fn new_var_init(name: &Token, initializer: &Expr) -> Stmt {
         Stmt::Var(name.clone(), Some(initializer.clone()))
+    }
+}
+
+impl fmt::Display for Stmt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Stmt::Expr(expr) => write!(f, "expr:{}", expr),
+            Stmt::Print(expr) => write!(f, "print expr:{}", expr),
+            Stmt::Var(token, oexpr) => {
+                if let Some(expr) = oexpr {
+                    write!(f, "var:{} expr:{}", token.lexeme, expr)
+                } else {
+                    write!(f, "var:{} expr:none", token.lexeme)
+                }
+            }
+        }
     }
 }

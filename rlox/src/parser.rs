@@ -161,7 +161,7 @@ impl Parser {
 
     fn print_stmt(&self) -> StmtResult {
         let val = self.expression()?;
-        self.consume(&TokenType::Semicolon, "expect ';' after value")?;
+        self.consume(&TokenType::Semicolon, "expect ';' after print statement")?;
         return Ok(Stmt::new_print(&val));
     }
 
