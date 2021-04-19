@@ -78,6 +78,7 @@ impl Expr {
         e
     }
 
+    #[allow(dead_code)]
     pub fn new_var_init(token: Token, initializer: &Expr) -> Expr {
         let e = Expr {
             etype: ExprType::Variable,

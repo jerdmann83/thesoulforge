@@ -7,23 +7,22 @@ use crate::token::*;
 use crate::token_type::*;
 use crate::value::*;
 
-use std::cell::RefCell;
-
 pub type InterpreterResult = Result<Value, RuntimeError>;
 pub type ExecuteResult = Result<(), RuntimeError>;
 
+#[derive(Debug)]
 pub struct Interpreter {
-    env: RefCell<Environment>,
+    env: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
-            env: RefCell::new(Environment::new()),
+            env: Environment::new(),
         }
     }
 
-    pub fn interpret(&self, stmts: &Vec<Stmt>) -> ExecuteResult {
+    pub fn interpret(&mut self, stmts: &Vec<Stmt>) -> ExecuteResult {
         for stmt in stmts {
             match self.execute(&stmt) {
                 Err(n) => {
@@ -36,22 +35,34 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn execute(&self, stmt: &Stmt) -> ExecuteResult {
+    pub fn execute(&mut self, stmt: &Stmt) -> ExecuteResult {
         self.eval_stmt(&stmt)
     }
 
-    pub fn eval_stmt(&self, stmt: &Stmt) -> ExecuteResult {
+    pub fn eval_stmt(&mut self, stmt: &Stmt) -> ExecuteResult {
         match stmt {
             Stmt::Expr(expr) => {
                 let _ = self.eval(&expr)?;
             }
             Stmt::Var(token, expr) => self.eval_var(&token, &expr)?,
+            Stmt::Block(stmts) => {
+                self.env.bump();
+                self.eval_block(stmts)?;
+                self.env.debump();
+            }
             Stmt::Print(expr) => self.eval_print(&expr)?,
         }
         Ok(())
     }
 
-    fn eval(&self, expr: &Expr) -> InterpreterResult {
+    pub fn eval_block(&mut self, stmts: &Vec<Stmt>) -> ExecuteResult {
+        for stmt in stmts {
+            self.execute(&stmt)?;
+        }
+        Ok(())
+    }
+
+    fn eval(&mut self, expr: &Expr) -> InterpreterResult {
         match expr.etype {
             ExprType::Grouping => return self.eval(&expr.children[0]),
             ExprType::Assign => return self.eval_assign(&expr),
@@ -59,20 +70,19 @@ impl Interpreter {
             ExprType::Binary => return self.eval_binary(&expr),
             ExprType::Unary => return self.eval_unary(&expr),
             ExprType::Variable => {
-                let env = self.env.borrow();
                 let name = &expr.token.lexeme;
-                match env.get(name, &expr.token.line) {
+                match self.env.get(name, &expr.token.line) {
                     Ok(v) => return Ok(v),
-                    Err(e) => return Err(RuntimeError::new(&e.msg, 0)),
+                    Err(e) => return Err(RuntimeError::new(&e.msg, expr.token.line)),
                 }
             }
         }
     }
 
-    fn eval_assign(&self, expr: &Expr) -> InterpreterResult {
+    fn eval_assign(&mut self, expr: &Expr) -> InterpreterResult {
         let val = self.eval(&expr.children[0])?;
-        let mut env = self.env.borrow_mut();
-        env.assign(&expr.token.lexeme, &val, &expr.token.line)?;
+        self.env
+            .assign(&expr.token.lexeme, &val, &expr.token.line)?;
         Ok(val)
     }
 
@@ -92,7 +102,7 @@ impl Interpreter {
         }
     }
 
-    fn eval_binary(&self, expr: &Expr) -> InterpreterResult {
+    fn eval_binary(&mut self, expr: &Expr) -> InterpreterResult {
         let left = self.eval(&expr.children[0])?;
         let right = self.eval(&expr.children[1])?;
         if let (Value::Number(ln), Value::Number(rn)) = (&left, &right) {
@@ -142,7 +152,7 @@ impl Interpreter {
         ))
     }
 
-    fn eval_unary(&self, expr: &Expr) -> InterpreterResult {
+    fn eval_unary(&mut self, expr: &Expr) -> InterpreterResult {
         let right = self.eval(&expr.children[0])?;
         if let Value::Number(n) = right {
             match expr.token.ttype {
@@ -163,17 +173,16 @@ impl Interpreter {
         ));
     }
 
-    fn eval_var(&self, tok: &Token, initializer: &Option<Expr>) -> ExecuteResult {
+    fn eval_var(&mut self, tok: &Token, initializer: &Option<Expr>) -> ExecuteResult {
         let mut val = Value::Nil;
         if let Some(expr) = initializer {
             val = self.eval(expr)?;
         }
-        let mut env = self.env.borrow_mut();
-        env.define(&tok.lexeme, &val);
+        self.env.define(&tok.lexeme, &val);
         Ok(())
     }
 
-    fn eval_print(&self, expr: &Expr) -> ExecuteResult {
+    fn eval_print(&mut self, expr: &Expr) -> ExecuteResult {
         let val = self.eval(&expr)?;
         println!("{}", val);
         Ok(())
@@ -188,6 +197,7 @@ impl Interpreter {
         }
     }
 
+    #[allow(dead_code)]
     fn is_equal(a: &Value, b: &Value) -> InterpreterResult {
         if let (Value::Nil, Value::Nil) = (&a, &b) {
             return Ok(Value::Bool(true));

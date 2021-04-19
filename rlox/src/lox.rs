@@ -1,6 +1,5 @@
 use std::io::{self, Read, Write};
 
-use crate::ast_printer::*;
 use crate::interpreter::*;
 use crate::parser::*;
 use crate::scanner::*;
@@ -30,15 +29,16 @@ impl Lox {
         if expr.is_err() {
             return;
         }
+        //println!("{:?}", expr);
         let expr = expr.unwrap();
 
         let mut ir = Interpreter::new();
         let val = ir.interpret(&expr);
 
-        println!("ast: {}", AstPrinter::serialize_stmts(&expr));
+        // println!("ast: {}", AstPrinter::serialize_stmts(&expr));
         match val {
             Ok(_) => {}
-            Err(e) => println!("error: {:?}", e),
+            Err(_e) => {} // println!("error: {:?}", e),
         }
 
         // if self.had_error {
@@ -57,6 +57,7 @@ impl Lox {
             let mut buf = String::new();
             io::stdin().read_line(&mut buf).unwrap();
             self.run(&buf);
+
             self.had_error = false;
             self.had_runtime_error = false;
         }
@@ -77,13 +78,14 @@ impl Lox {
     }
 
     pub fn runtime_error(msg: &str) {
-        Lox::report(0, "", msg);
+        eprintln!("runtime error: {}", msg);
     }
 
     pub fn report(line: usize, loc: &str, msg: &str) {
         eprintln!("[line {}] error{}: {}", line, loc, msg);
     }
 
+    #[allow(dead_code)]
     pub fn token_error(t: Token, msg: &str) {
         match t.ttype {
             TokenType::EOF => Self::report(t.line, " at end", msg),

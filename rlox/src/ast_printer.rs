@@ -1,5 +1,4 @@
 use crate::expr::*;
-use crate::lox::*;
 use crate::stmt::*;
 
 pub struct AstPrinter {}
@@ -15,7 +14,7 @@ impl AstPrinter {
             println!("{}", stmt);
             match stmt {
                 Stmt::Expr(expr) => buf.push_str(&Self::parenthesize(expr)),
-                Stmt::Print(expr) => {}
+                Stmt::Print(_) => {}
                 _ => {}
             }
         }

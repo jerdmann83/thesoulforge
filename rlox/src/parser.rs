@@ -153,8 +153,10 @@ impl Parser {
 
     fn statement(&self) -> StmtResult {
         if self.is_match(&[TokenType::Print]) {
-            println!("{:?}", self.previous());
             return self.print_stmt();
+        }
+        if self.is_match(&[TokenType::LeftBrace]) {
+            return self.block();
         }
         return self.expr_stmt();
     }
@@ -163,6 +165,16 @@ impl Parser {
         let val = self.expression()?;
         self.consume(&TokenType::Semicolon, "expect ';' after print statement")?;
         return Ok(Stmt::new_print(&val));
+    }
+
+    fn block(&self) -> StmtResult {
+        let mut stmts = vec![];
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            stmts.push(self.declaration()?);
+        }
+
+        self.consume(&TokenType::RightBrace, "expect '}' after block")?;
+        return Ok(Stmt::new_block(&stmts));
     }
 
     fn expr_stmt(&self) -> StmtResult {
@@ -334,9 +346,7 @@ mod test {
             Token::new(TokenType::Number(4.0), "4", 1),
             Token::new(TokenType::EOF, "", 1),
         ]);
-        // let stmts = p.parse().unwrap();
-        // for stmt in stmts {
-        //     println!("{:?}", AstPrinter::serialize(&stmt.expr));
-        // }
+        let stmts = p.parse().unwrap();
+        println!("{:?}", AstPrinter::serialize_stmts(&stmts));
     }
 }

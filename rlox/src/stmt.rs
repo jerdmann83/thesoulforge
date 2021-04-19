@@ -16,6 +16,7 @@ use std::fmt;
 pub enum Stmt {
     Expr(Expr),
     Print(Expr),
+    Block(Vec<Stmt>),
     Var(Token, Option<Expr>),
 }
 
@@ -35,6 +36,10 @@ impl Stmt {
     pub fn new_var_init(name: &Token, initializer: &Expr) -> Stmt {
         Stmt::Var(name.clone(), Some(initializer.clone()))
     }
+
+    pub fn new_block(stmts: &Vec<Stmt>) -> Stmt {
+        Stmt::Block(stmts.clone())
+    }
 }
 
 impl fmt::Display for Stmt {
@@ -42,6 +47,11 @@ impl fmt::Display for Stmt {
         match self {
             Stmt::Expr(expr) => write!(f, "expr:{}", expr),
             Stmt::Print(expr) => write!(f, "print expr:{}", expr),
+            Stmt::Block(_stmts) => {
+                write!(f, "block")
+                // for &stmt in stmts {
+                // }
+            }
             Stmt::Var(token, oexpr) => {
                 if let Some(expr) = oexpr {
                     write!(f, "var:{} expr:{}", token.lexeme, expr)
