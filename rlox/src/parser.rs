@@ -56,7 +56,7 @@ impl Parser {
 
     fn is_match(&self, tts: &[TokenType]) -> bool {
         for tt in tts {
-            if self.check(tt) {
+            if self.check(tt.clone()) {
                 self.advance();
                 return true;
             }
@@ -65,7 +65,7 @@ impl Parser {
         false
     }
 
-    fn consume(&self, tt: &TokenType, msg: &str) -> ConsumeResult {
+    fn consume(&self, tt: TokenType, msg: &str) -> ConsumeResult {
         if self.check(tt) {
             self.advance();
             return Ok(());
@@ -73,7 +73,7 @@ impl Parser {
         Err(ParseError::new(msg))
     }
 
-    fn check(&self, tt: &TokenType) -> bool {
+    fn check(&self, tt: TokenType) -> bool {
         if self.is_at_end() {
             return false;
         }
@@ -129,10 +129,7 @@ impl Parser {
     }
 
     fn var_declaration(&self) -> StmtResult {
-        self.consume(
-            &TokenType::Identifier(String::new()),
-            "expect variable name",
-        )?;
+        self.consume(TokenType::Identifier(String::new()), "expect variable name")?;
         let tok = self.previous();
 
         if self.is_match(&[TokenType::Semicolon]) {
@@ -145,13 +142,16 @@ impl Parser {
 
         let initializer = self.expression()?;
         self.consume(
-            &TokenType::Semicolon,
+            TokenType::Semicolon,
             "expect ';' after variable declaration",
         )?;
         return Ok(Stmt::new_var_init(&tok, &initializer));
     }
 
     fn statement(&self) -> StmtResult {
+        if self.is_match(&[TokenType::If]) {
+            return self.if_stmt();
+        }
         if self.is_match(&[TokenType::Print]) {
             return self.print_stmt();
         }
@@ -161,25 +161,39 @@ impl Parser {
         return self.expr_stmt();
     }
 
+    fn if_stmt(&self) -> StmtResult {
+        self.consume(TokenType::LeftParen, "expect '(' after if")?;
+        let cond = self.expression()?;
+        self.consume(TokenType::RightParen, "expect ')' after condition")?;
+
+        let then = self.statement()?;
+        let mut els = None;
+        if self.is_match(&[TokenType::Else]) {
+            els = Some(self.statement()?);
+        }
+
+        Ok(Stmt::new_if(&cond, &then, &els))
+    }
+
     fn print_stmt(&self) -> StmtResult {
         let val = self.expression()?;
-        self.consume(&TokenType::Semicolon, "expect ';' after print statement")?;
+        self.consume(TokenType::Semicolon, "expect ';' after print statement")?;
         return Ok(Stmt::new_print(&val));
     }
 
     fn block(&self) -> StmtResult {
         let mut stmts = vec![];
-        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
             stmts.push(self.declaration()?);
         }
 
-        self.consume(&TokenType::RightBrace, "expect '}' after block")?;
+        self.consume(TokenType::RightBrace, "expect '}' after block")?;
         return Ok(Stmt::new_block(&stmts));
     }
 
     fn expr_stmt(&self) -> StmtResult {
         let expr = self.expression()?;
-        self.consume(&TokenType::Semicolon, "expect ';' after statement")?;
+        self.consume(TokenType::Semicolon, "expect ';' after statement")?;
         return Ok(Stmt::new_expr(&expr));
     }
 
@@ -291,7 +305,7 @@ impl Parser {
 
         if self.is_match(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
-            self.consume(&TokenType::RightParen, "expect ')' after expression.")?;
+            self.consume(TokenType::RightParen, "expect ')' after expression.")?;
             return Ok(Expr::new_grouping(&expr));
         }
 

@@ -51,6 +51,23 @@ impl Interpreter {
                 self.env.debump();
             }
             Stmt::Print(expr) => self.eval_print(&expr)?,
+            Stmt::If(expr, then, els) => self.eval_if(expr, then, els)?,
+        }
+        Ok(())
+    }
+
+    pub fn eval_if(
+        &mut self,
+        cond: &Expr,
+        then: &Box<Stmt>,
+        els: &Box<Option<Stmt>>,
+    ) -> ExecuteResult {
+        if Self::is_truthy(&self.eval(&cond)?) {
+            self.eval_stmt(&*then);
+        } else {
+            if let Some(stmt) = &**els {
+                self.eval_stmt(&stmt);
+            }
         }
         Ok(())
     }
