@@ -19,6 +19,7 @@ pub enum Stmt {
     If(Expr, Box<Stmt>, Box<Option<Stmt>>),
     Block(Vec<Stmt>),
     Var(Token, Option<Expr>),
+    While(Expr, Box<Stmt>),
 }
 
 impl Stmt {
@@ -45,6 +46,10 @@ impl Stmt {
     pub fn new_block(stmts: &Vec<Stmt>) -> Stmt {
         Stmt::Block(stmts.clone())
     }
+
+    pub fn new_while(cond: &Expr, body: &Stmt) -> Stmt {
+        Stmt::While(cond.clone(), Box::new(body.clone()))
+    }
 }
 
 impl fmt::Display for Stmt {
@@ -55,6 +60,11 @@ impl fmt::Display for Stmt {
             Stmt::If(expr, _then, _else) => write!(f, "if expr:{}", expr),
             Stmt::Block(_stmts) => {
                 write!(f, "block")
+                // for &stmt in stmts {
+                // }
+            }
+            Stmt::While(_cond, _block) => {
+                write!(f, "while")
                 // for &stmt in stmts {
                 // }
             }

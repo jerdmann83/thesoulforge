@@ -9,6 +9,7 @@ pub enum ExprType {
     Unary,
     Grouping,
     Literal,
+    Logical,
     Variable,
 }
 
@@ -74,6 +75,24 @@ impl Expr {
             etype: ExprType::Literal,
             token: token,
             children: vec![],
+        };
+        e
+    }
+
+    pub fn new_or(left: Expr, token: Token, right: Expr) -> Expr {
+        let e = Expr {
+            etype: ExprType::Logical,
+            token: token,
+            children: vec![left, right],
+        };
+        e
+    }
+
+    pub fn new_and(left: Expr, token: Token, right: Expr) -> Expr {
+        let e = Expr {
+            etype: ExprType::Logical,
+            token: token,
+            children: vec![left, right],
         };
         e
     }

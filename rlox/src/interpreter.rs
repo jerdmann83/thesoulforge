@@ -52,6 +52,7 @@ impl Interpreter {
             }
             Stmt::Print(expr) => self.eval_print(&expr)?,
             Stmt::If(expr, then, els) => self.eval_if(expr, then, els)?,
+            Stmt::While(cond, body) => self.eval_while(cond, body)?,
         }
         Ok(())
     }
@@ -68,6 +69,13 @@ impl Interpreter {
             if let Some(stmt) = &**els {
                 self.eval_stmt(&stmt);
             }
+        }
+        Ok(())
+    }
+
+    pub fn eval_while(&mut self, cond: &Expr, body: &Box<Stmt>) -> ExecuteResult {
+        while Self::is_truthy(&self.eval(&cond)?) {
+            self.eval_stmt(body);
         }
         Ok(())
     }
@@ -93,6 +101,7 @@ impl Interpreter {
                     Err(e) => return Err(RuntimeError::new(&e.msg, expr.token.line)),
                 }
             }
+            ExprType::Logical => return self.eval_logical(&expr),
         }
     }
 
@@ -167,6 +176,25 @@ impl Interpreter {
             ),
             expr.token.line,
         ))
+    }
+
+    fn eval_logical(&mut self, expr: &Expr) -> InterpreterResult {
+        let left = self.eval(&expr.children[0])?;
+
+        // short-circuit behaviors
+        if expr.token.ttype == TokenType::Or {
+            // or with a truthy left means we're done
+            if Self::is_truthy(&left) {
+                return Ok(left);
+            }
+        } else {
+            // and with a falsy left also means we're done
+            if !Self::is_truthy(&left) {
+                return Ok(left);
+            }
+        }
+
+        return self.eval(&expr.children[1]);
     }
 
     fn eval_unary(&mut self, expr: &Expr) -> InterpreterResult {

@@ -155,6 +155,12 @@ impl Parser {
         if self.is_match(&[TokenType::Print]) {
             return self.print_stmt();
         }
+        if self.is_match(&[TokenType::While]) {
+            return self.while_stmt();
+        }
+        if self.is_match(&[TokenType::For]) {
+            return self.for_stmt();
+        }
         if self.is_match(&[TokenType::LeftBrace]) {
             return self.block();
         }
@@ -175,10 +181,57 @@ impl Parser {
         Ok(Stmt::new_if(&cond, &then, &els))
     }
 
+    fn for_stmt(&self) -> StmtResult {
+        self.consume(TokenType::LeftParen, "expect '(' after for")?;
+        let mut init: Option<Stmt>;
+        if self.is_match(&[TokenType::Semicolon]) {
+            init = None;
+        } else if self.is_match(&[TokenType::Var]) {
+            init = Some(self.var_declaration()?);
+        } else {
+            init = Some(self.expr_stmt()?);
+        }
+
+        let mut cond: Option<Expr>;
+        if self.check(TokenType::Semicolon) {
+            cond = None;
+        } else {
+            cond = Some(self.expression()?);
+        }
+        self.consume(TokenType::Semicolon, "expect ';' after loop condition")?;
+
+        let mut incr: Option<Expr>;
+        if self.check(TokenType::RightParen) {
+            incr = None;
+        } else {
+            incr = Some(self.expression()?);
+        }
+        self.consume(TokenType::Semicolon, "expect ';' after loop condition")?;
+
+        let body = self.statement()?;
+
+        // desugar the above components into a base expr
+        // if let Some(incr_exp) = incr {
+        //     body = Stmt::new_block(
+        //         body,
+        //         Stmt::new_expr());
+        // }
+        todo!();
+    }
+
     fn print_stmt(&self) -> StmtResult {
         let val = self.expression()?;
         self.consume(TokenType::Semicolon, "expect ';' after print statement")?;
         return Ok(Stmt::new_print(&val));
+    }
+
+    fn while_stmt(&self) -> StmtResult {
+        self.consume(TokenType::LeftParen, "expect '(' after while");
+        let cond = self.expression()?;
+        self.consume(TokenType::RightParen, "expect ')' after condition");
+        let body = self.statement()?;
+
+        Ok(Stmt::new_while(&cond, &body))
     }
 
     fn block(&self) -> StmtResult {
@@ -188,13 +241,13 @@ impl Parser {
         }
 
         self.consume(TokenType::RightBrace, "expect '}' after block")?;
-        return Ok(Stmt::new_block(&stmts));
+        Ok(Stmt::new_block(&stmts))
     }
 
     fn expr_stmt(&self) -> StmtResult {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "expect ';' after statement")?;
-        return Ok(Stmt::new_expr(&expr));
+        Ok(Stmt::new_expr(&expr))
     }
 
     fn expression(&self) -> ExprResult {
@@ -202,7 +255,7 @@ impl Parser {
     }
 
     fn assignment(&self) -> ExprResult {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.is_match(&[TokenType::Equal]) {
             let equals = self.previous();
@@ -216,6 +269,28 @@ impl Parser {
             self.error(&equals, "invalid assignment target");
         }
 
+        Ok(expr)
+    }
+
+    fn or(&self) -> ExprResult {
+        let mut expr = self.and()?;
+
+        while self.is_match(&[TokenType::Or]) {
+            let op = self.previous();
+            let right = self.and()?;
+            expr = Expr::new_or(expr, op, right);
+        }
+        Ok(expr)
+    }
+
+    fn and(&self) -> ExprResult {
+        let mut expr = self.equality()?;
+
+        while self.is_match(&[TokenType::And]) {
+            let op = self.previous();
+            let right = self.equality()?;
+            expr = Expr::new_and(expr, op, right);
+        }
         Ok(expr)
     }
 
