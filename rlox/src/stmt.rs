@@ -55,24 +55,28 @@ impl Stmt {
 impl fmt::Display for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Stmt::Expr(expr) => write!(f, "expr:{}", expr),
-            Stmt::Print(expr) => write!(f, "print expr:{}", expr),
-            Stmt::If(expr, _then, _else) => write!(f, "if expr:{}", expr),
-            Stmt::Block(_stmts) => {
-                write!(f, "block")
-                // for &stmt in stmts {
-                // }
+            Stmt::Expr(expr) => write!(f, "\nexpr:{:?}", expr),
+            Stmt::Print(expr) => write!(f, "\nprint expr:{:?}", expr),
+            Stmt::If(expr, _then, _else) => write!(f, "\nif expr:{:?}", expr),
+            Stmt::Block(stmts) => {
+                write!(f, "\nblock")?;
+                for stmt in stmts {
+                    write!(f, "\n{:?}", stmt)?;
+                }
+                Ok(())
+                // let mut rc;
             }
-            Stmt::While(_cond, _block) => {
-                write!(f, "while")
-                // for &stmt in stmts {
-                // }
+            Stmt::While(cond, block) => {
+                write!(f, "\nwhile")?;
+                write!(f, "\ncond {:?}", cond)?;
+                write!(f, "\nblock {:?}", block)?;
+                Ok(())
             }
             Stmt::Var(token, oexpr) => {
                 if let Some(expr) = oexpr {
-                    write!(f, "var:{} expr:{}", token.lexeme, expr)
+                    write!(f, "\nvar:{:?} expr:{:?}", token.lexeme, expr)
                 } else {
-                    write!(f, "var:{} expr:none", token.lexeme)
+                    write!(f, "\nvar:{:?} expr:none", token.lexeme)
                 }
             }
         }

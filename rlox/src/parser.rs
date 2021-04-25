@@ -227,17 +227,20 @@ impl Parser {
             body = Stmt::new_block(&stmts);
         }
 
-        let incr_stmt = self.statement()?;
+        // forever/spin cond if none present
         if cond.is_none() {
             cond = Some(Expr::new_literal(Token::new(TokenType::True, "true", 0)));
         }
 
+        body = Stmt::new_while(&cond.unwrap(), &body);
+
+        // toss incr in front of the while body
         if let Some(init_expr) = init {
             let mut stmts = vec![];
-            stmts.push(&init_expr);
-            stmts.push(&body);
+            stmts.push(init_expr);
+            stmts.push(body);
+            body = Stmt::new_block(&stmts);
         }
-        body = Stmt::new_while(&cond.unwrap(), &body);
         Ok(body)
     }
 

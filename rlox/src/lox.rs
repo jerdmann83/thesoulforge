@@ -122,6 +122,7 @@ mod test {
     use super::*;
 
     fn lox_test(buf: &str) {
+        println!("{}", buf);
         let mut l = Lox::new();
         l.run(&buf);
         assert_no_errs();
@@ -179,8 +180,7 @@ print c;"#;
         let buf = "
     for (var x=0; x<10; x=x+1) {
         print x;
-    }
-    print 1;";
+    }";
         lox_test(buf);
     }
 }
