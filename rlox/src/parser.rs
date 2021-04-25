@@ -182,8 +182,18 @@ impl Parser {
     }
 
     fn for_stmt(&self) -> StmtResult {
+        // a for statement is just sugar for a while loop that looks like:
+        // var i = 0;
+        // while (i < 10) {
+        //   print i;
+        //   i = i + 1;
+        // }
+        // the for syntax equilivent is:
+        // for (var i=0; i<10; i += 1) {
+        //   print i;
+        // }
         self.consume(TokenType::LeftParen, "expect '(' after for")?;
-        let mut init: Option<Stmt>;
+        let init: Option<Stmt>;
         if self.is_match(&[TokenType::Semicolon]) {
             init = None;
         } else if self.is_match(&[TokenType::Var]) {
@@ -206,17 +216,29 @@ impl Parser {
         } else {
             incr = Some(self.expression()?);
         }
-        self.consume(TokenType::Semicolon, "expect ';' after loop condition")?;
+        self.consume(TokenType::RightParen, "expect ')' after loop increment")?;
 
-        let body = self.statement()?;
+        // desugar (resugar?) the above components into a while statement
+        let mut body = self.statement()?;
+        if let Some(incr_exp) = incr {
+            let mut stmts = vec![];
+            stmts.push(body);
+            stmts.push(Stmt::new_expr(&incr_exp));
+            body = Stmt::new_block(&stmts);
+        }
 
-        // desugar the above components into a base expr
-        // if let Some(incr_exp) = incr {
-        //     body = Stmt::new_block(
-        //         body,
-        //         Stmt::new_expr());
-        // }
-        todo!();
+        let incr_stmt = self.statement()?;
+        if cond.is_none() {
+            cond = Some(Expr::new_literal(Token::new(TokenType::True, "true", 0)));
+        }
+
+        if let Some(init_expr) = init {
+            let mut stmts = vec![];
+            stmts.push(&init_expr);
+            stmts.push(&body);
+        }
+        body = Stmt::new_while(&cond.unwrap(), &body);
+        Ok(body)
     }
 
     fn print_stmt(&self) -> StmtResult {
@@ -226,9 +248,9 @@ impl Parser {
     }
 
     fn while_stmt(&self) -> StmtResult {
-        self.consume(TokenType::LeftParen, "expect '(' after while");
+        self.consume(TokenType::LeftParen, "expect '(' after while")?;
         let cond = self.expression()?;
-        self.consume(TokenType::RightParen, "expect ')' after condition");
+        self.consume(TokenType::RightParen, "expect ')' after condition")?;
         let body = self.statement()?;
 
         Ok(Stmt::new_while(&cond, &body))
@@ -426,13 +448,15 @@ mod test {
     #[test]
     fn test_parser() {
         let p = Parser::new(&[
-            Token::new(TokenType::Number(5.0), "5", 1),
+            Token::new(TokenType::Var, "var", 1),
+            Token::new(TokenType::Identifier("x".to_string()), "x", 1),
             Token::new(TokenType::Equal, "=", 1),
             Token::new(TokenType::Number(1.0), "1", 1),
             Token::new(TokenType::Plus, "+", 1),
             Token::new(TokenType::Number(9.0), "9", 1),
             Token::new(TokenType::Minus, "-", 1),
             Token::new(TokenType::Number(4.0), "4", 1),
+            Token::new(TokenType::Semicolon, ";", 1),
             Token::new(TokenType::EOF, "", 1),
         ]);
         let stmts = p.parse().unwrap();

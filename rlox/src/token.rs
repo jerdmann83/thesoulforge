@@ -4,7 +4,6 @@ use crate::token_type::TokenType;
 pub struct Token {
     pub ttype: TokenType,
     pub lexeme: String,
-    // object literal?
     pub line: usize,
 }
 

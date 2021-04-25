@@ -64,10 +64,10 @@ impl Interpreter {
         els: &Box<Option<Stmt>>,
     ) -> ExecuteResult {
         if Self::is_truthy(&self.eval(&cond)?) {
-            self.eval_stmt(&*then);
+            self.eval_stmt(&*then)?;
         } else {
             if let Some(stmt) = &**els {
-                self.eval_stmt(&stmt);
+                self.eval_stmt(&stmt)?;
             }
         }
         Ok(())
@@ -75,7 +75,7 @@ impl Interpreter {
 
     pub fn eval_while(&mut self, cond: &Expr, body: &Box<Stmt>) -> ExecuteResult {
         while Self::is_truthy(&self.eval(&cond)?) {
-            self.eval_stmt(body);
+            self.eval_stmt(body)?;
         }
         Ok(())
     }
