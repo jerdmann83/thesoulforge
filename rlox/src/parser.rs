@@ -210,7 +210,7 @@ impl Parser {
         }
         self.consume(TokenType::Semicolon, "expect ';' after loop condition")?;
 
-        let mut incr: Option<Expr>;
+        let incr: Option<Expr>;
         if self.check(TokenType::RightParen) {
             incr = None;
         } else {
@@ -383,7 +383,42 @@ impl Parser {
             return Ok(Expr::new_unary(operator, right));
         }
 
-        self.primary()
+        self.call()
+    }
+
+    fn call(&self) -> ExprResult {
+        let mut expr = self.primary()?;
+
+        loop {
+            if !self.is_match(&[TokenType::LeftParen]) {
+                break;
+            }
+            expr = self.finish_call(&expr)?;
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&self, callee: &Expr) -> ExprResult {
+        let mut args = vec![];
+
+        if !self.check(TokenType::RightParen) {
+            let mut overflow = false;
+            while {
+                if args.len() > 255 {
+                    if !overflow {
+                        overflow = true;
+                        self.error(&self.peek(), "too many args");
+                    }
+                }
+                args.push(self.expression()?);
+                self.is_match(&[TokenType::Comma])
+            } {}
+        }
+
+        self.consume(TokenType::RightParen, "expect ')' after args")?;
+        let paren = self.previous();
+        Ok(Expr::new_call(callee, paren, &args))
     }
 
     fn primary(&self) -> ExprResult {

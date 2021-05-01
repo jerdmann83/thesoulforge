@@ -4,6 +4,7 @@ mod ast_printer;
 mod environment;
 mod error;
 mod expr;
+mod function;
 mod interpreter;
 mod lox;
 mod parser;

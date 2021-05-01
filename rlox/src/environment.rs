@@ -2,7 +2,7 @@ use crate::error::*;
 use crate::value::*;
 use std::collections::HashMap;
 
-type ValMap = HashMap<String, Value>;
+pub type ValMap = HashMap<String, Value>;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
@@ -12,13 +12,13 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
-        Environment {
+        Self {
             values: vec![HashMap::new()],
             gen: 0,
         }
     }
 
-    // TODO: really want to raii the below two.  hack for now
+    // TODO: really want to raii these.  hack for now
     pub fn bump(&mut self) {
         self.gen += 1;
         while self.values.len() <= self.gen {
@@ -27,23 +27,38 @@ impl Environment {
     }
 
     pub fn debump(&mut self) {
-        self.gen -= 1;
+        if self.gen > 0 {
+            self.gen -= 1;
+        }
     }
 
-    pub fn define(&mut self, name: &str, val: &Value) {
+    pub fn bump_num(&mut self, num: usize) {
+        self.gen += num;
+        while self.values.len() <= self.gen {
+            self.values.push(HashMap::new());
+        }
+    }
+
+    pub fn reset(&mut self) -> usize {
+        let num = self.gen;
+        self.gen = 0;
+        num
+    }
+
+    pub fn define(&mut self, name: &str, val: Value) {
         let vals = &mut self.values[self.gen];
         vals.insert(name.to_string(), val.clone());
     }
 
-    pub fn assign(&mut self, name: &str, val: &Value, line: &usize) -> Result<(), RuntimeError> {
+    pub fn assign(&mut self, name: &str, val: Value, line: usize) -> Result<(), RuntimeError> {
         self.assign_impl(name, val, line, self.gen)
     }
 
     fn assign_impl(
         &mut self,
         name: &str,
-        val: &Value,
-        line: &usize,
+        val: Value,
+        line: usize,
         gen: usize,
     ) -> Result<(), RuntimeError> {
         let vals = &mut self.values[gen];
@@ -55,18 +70,18 @@ impl Environment {
         if gen == 0 {
             return Err(RuntimeError::new(
                 &format!("undefined variable '{}'", name),
-                *line,
+                line,
             ));
         }
 
         self.assign_impl(name, val, line, gen - 1)
     }
 
-    pub fn get(&self, name: &str, line: &usize) -> Result<Value, RuntimeError> {
+    pub fn get(&self, name: &str, line: usize) -> Result<Value, RuntimeError> {
         self.get_impl(name, line, self.gen)
     }
 
-    fn get_impl(&self, name: &str, line: &usize, gen: usize) -> Result<Value, RuntimeError> {
+    fn get_impl(&self, name: &str, line: usize, gen: usize) -> Result<Value, RuntimeError> {
         let vals = &self.values[gen];
         if let Some(val) = vals.get(name) {
             return Ok(val.clone());
@@ -75,7 +90,7 @@ impl Environment {
         if gen == 0 {
             return Err(RuntimeError::new(
                 &format!("undefined variable '{}'", name),
-                *line,
+                line,
             ));
         }
 
@@ -89,32 +104,33 @@ mod test {
 
     #[cfg(test)]
     fn assert_get(env: &Environment, name: &str, expect: Value) {
-        let val = env.get(name, &0);
+        let val = env.get(name, 0);
         assert!(val.is_ok());
         assert_eq!(val.unwrap(), expect);
     }
 
     #[cfg(test)]
     fn assert_none(env: &Environment, name: &str) {
-        let val = env.get(name, &0);
+        let val = env.get(name, 0);
+        println!("{:?}", val);
         assert!(val.is_err());
     }
 
     #[test]
     fn env() {
         let mut env = Environment::new();
-        env.define("a", &Value::String("foo".to_string()));
+        env.define("a", Value::String("foo".to_string()));
 
         env.bump();
-        env.assign("a", &Value::String("bar".to_string()), &0)
+        env.assign("a", Value::String("bar".to_string()), 0)
             .unwrap();
         assert_get(&env, "a", Value::String("bar".to_string()));
 
-        env.define("b", &Value::String("baz".to_string()));
+        env.define("b", Value::String("baz".to_string()));
         assert_get(&env, "a", Value::String("bar".to_string()));
 
         env.bump();
-        env.assign("a", &Value::String("final".to_string()), &0)
+        env.assign("a", Value::String("final".to_string()), 0)
             .unwrap();
         assert_get(&env, "a", Value::String("final".to_string()));
 

@@ -2,17 +2,7 @@ use crate::expr::*;
 use crate::token::*;
 use std::fmt;
 
-/// statement grammar
-/// program        → declaration* EOF ;
-///
-/// declaration    → varDecl
-///                | statement ;
-///
-/// varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
-/// statement      → exprStmt
-///                | printStmt ;
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
     Expr(Expr),
     Print(Expr),

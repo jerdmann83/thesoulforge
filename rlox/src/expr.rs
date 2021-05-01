@@ -6,6 +6,7 @@ use std::fmt;
 pub enum ExprType {
     Assign,
     Binary,
+    Call,
     Unary,
     Grouping,
     Literal,
@@ -13,7 +14,7 @@ pub enum ExprType {
     Variable,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Expr {
     pub etype: ExprType,
     pub token: Token,
@@ -112,6 +113,15 @@ impl Expr {
             etype: ExprType::Variable,
             token: token,
             children: vec![],
+        };
+        e
+    }
+
+    pub fn new_call(_callee: &Expr, token: Token, args: &Vec<Expr>) -> Expr {
+        let e = Expr {
+            etype: ExprType::Call,
+            token: token,
+            children: args.clone(),
         };
         e
     }

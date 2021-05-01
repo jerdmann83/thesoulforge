@@ -183,4 +183,20 @@ print c;"#;
     }";
         lox_test(buf);
     }
+
+    #[test]
+    pub fn lox_global_functions() {
+        let buf = r#"
+        print clock();"#;
+        lox_test(buf);
+    }
+
+    #[test]
+    pub fn lox_user_functions() {
+        let buf = r#"
+fun add(a, b, c) {
+  print a + b + c;
+}"#;
+        lox_test(buf);
+    }
 }

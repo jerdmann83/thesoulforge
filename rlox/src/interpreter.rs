@@ -1,11 +1,15 @@
 use crate::environment::*;
 use crate::error::*;
 use crate::expr::*;
+use crate::function::*;
 use crate::lox::*;
 use crate::stmt::*;
 use crate::token::*;
 use crate::token_type::*;
 use crate::value::*;
+
+use std::mem;
+use std::time::SystemTime;
 
 pub type InterpreterResult = Result<Value, RuntimeError>;
 pub type ExecuteResult = Result<(), RuntimeError>;
@@ -15,11 +19,60 @@ pub struct Interpreter {
     env: Environment,
 }
 
+pub trait Callable {
+    fn arity() -> u8;
+    fn call(&self, interpreter: &mut Interpreter, args: Vec<Expr>) -> Value;
+}
+
+struct Clock {}
+
+impl Callable for Clock {
+    fn arity() -> u8 {
+        0
+    }
+    fn call(&self, _: &mut Interpreter, _args: Vec<Expr>) -> Value {
+        Value::Number(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as f64,
+        )
+    }
+}
+
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter {
-            env: Environment::new(),
-        }
+        let mut env = Environment::new();
+        env.define(
+            "clock",
+            // lame hardcoded weird literal for now
+            Value::Function(LoxFunction::new(&Stmt::new_expr(&Expr::new_literal(
+                Token::new(TokenType::Number(1.0), "1.0", 0),
+            )))),
+        );
+        env.bump();
+        Interpreter { env: env }
+    }
+
+    // environments basically form a graph structure.  for example, if we're a few blocks deep,
+    // then we start running some function calls, and each function opens more blocks in turn, the
+    // env tree looks something like:
+    //
+    // |- globals -> 1 -> 2 -> 3
+    // |     |
+    // |     v
+    // |   fn1 ----> 1
+    // |
+    // |
+    // --> fn2 ----> 1 -> 2
+    //
+    // instead of dealing with Rc<RefCell> swap headaches, just expose a helper here that clones
+    // the environment only at the globals level.  it's less than efficient but it's a hack that
+    // buys me time while I continue the journey...
+    pub fn new_function_env(&self) -> Environment {
+        let mut env = self.env.clone();
+        env.reset();
+        env
     }
 
     pub fn interpret(&mut self, stmts: &Vec<Stmt>) -> ExecuteResult {
@@ -87,16 +140,30 @@ impl Interpreter {
         Ok(())
     }
 
-    fn eval(&mut self, expr: &Expr) -> InterpreterResult {
+    pub fn eval_function_block(
+        &mut self,
+        stmts: &Vec<Stmt>,
+        env: &mut Environment,
+    ) -> ExecuteResult {
+        mem::swap(&mut self.env, env);
+        for stmt in stmts {
+            self.execute(&stmt)?;
+        }
+        mem::swap(&mut self.env, env);
+        Ok(())
+    }
+
+    pub fn eval(&mut self, expr: &Expr) -> InterpreterResult {
         match expr.etype {
             ExprType::Grouping => return self.eval(&expr.children[0]),
             ExprType::Assign => return self.eval_assign(&expr),
             ExprType::Literal => return self.eval_literal(&expr),
             ExprType::Binary => return self.eval_binary(&expr),
             ExprType::Unary => return self.eval_unary(&expr),
+            ExprType::Call => return self.eval_call(&expr),
             ExprType::Variable => {
                 let name = &expr.token.lexeme;
-                match self.env.get(name, &expr.token.line) {
+                match self.env.get(name, expr.token.line) {
                     Ok(v) => return Ok(v),
                     Err(e) => return Err(RuntimeError::new(&e.msg, expr.token.line)),
                 }
@@ -108,7 +175,7 @@ impl Interpreter {
     fn eval_assign(&mut self, expr: &Expr) -> InterpreterResult {
         let val = self.eval(&expr.children[0])?;
         self.env
-            .assign(&expr.token.lexeme, &val, &expr.token.line)?;
+            .assign(&expr.token.lexeme, val.clone(), expr.token.line)?;
         Ok(val)
     }
 
@@ -178,6 +245,10 @@ impl Interpreter {
         ))
     }
 
+    fn eval_call(&mut self, _expr: &Expr) -> InterpreterResult {
+        todo!();
+    }
+
     fn eval_logical(&mut self, expr: &Expr) -> InterpreterResult {
         let left = self.eval(&expr.children[0])?;
 
@@ -223,7 +294,7 @@ impl Interpreter {
         if let Some(expr) = initializer {
             val = self.eval(expr)?;
         }
-        self.env.define(&tok.lexeme, &val);
+        self.env.define(&tok.lexeme, val);
         Ok(())
     }
 
@@ -239,6 +310,7 @@ impl Interpreter {
             Value::Nil => false,
             Value::Number(_) => true,
             Value::String(_) => true,
+            Value::Function(_) => true,
         }
     }
 
