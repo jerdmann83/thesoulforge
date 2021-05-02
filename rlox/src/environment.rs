@@ -47,7 +47,7 @@ impl Environment {
 
     pub fn define(&mut self, name: &str, val: Value) {
         let vals = &mut self.values[self.gen];
-        vals.insert(name.to_string(), val.clone());
+        vals.insert(name.to_string(), val);
     }
 
     pub fn assign(&mut self, name: &str, val: Value, line: usize) -> Result<(), RuntimeError> {
@@ -63,7 +63,7 @@ impl Environment {
     ) -> Result<(), RuntimeError> {
         let vals = &mut self.values[gen];
         if vals.contains_key(name) {
-            vals.insert(name.to_string(), val.clone());
+            vals.insert(name.to_string(), val);
             return Ok(());
         }
 

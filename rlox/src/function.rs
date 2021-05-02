@@ -41,7 +41,7 @@ impl Callable for LoxFunction {
             }
         }
 
-        let res = interpreter.eval_function_block(&self.decl, &mut env);
+        let _res = interpreter.eval_function_block(&self.decl, &mut env);
         // let val: Value;
         // match res {
         //     Ok(v) => val = v,

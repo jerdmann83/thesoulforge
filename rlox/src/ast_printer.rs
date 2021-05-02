@@ -76,7 +76,7 @@ mod test {
                 Token::new(TokenType::Minus, "-", 1),
                 Expr::new_literal(Token::new(TokenType::Number(123.0), "123", 1)),
             ),
-            Expr::new_grouping(&Expr::new_literal(Token::new(
+            Expr::new_grouping(Expr::new_literal(Token::new(
                 TokenType::Number(45.67),
                 "45.67",
                 1,

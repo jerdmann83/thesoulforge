@@ -247,6 +247,7 @@ impl Interpreter {
 
     fn eval_call(&mut self, _expr: &Expr) -> InterpreterResult {
         todo!();
+        // let func = LoxFunction::new(expr);
     }
 
     fn eval_logical(&mut self, expr: &Expr) -> InterpreterResult {

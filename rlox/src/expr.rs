@@ -60,13 +60,13 @@ impl Expr {
         e
     }
 
-    pub fn new_grouping(expr: &Expr) -> Expr {
+    pub fn new_grouping(expr: Expr) -> Expr {
         let e = Expr {
             etype: ExprType::Grouping,
             // hack in a token type because I really don't want to deal with
             // token nullability in however many places these things appear
             token: Token::new(TokenType::EOF, "", 0),
-            children: vec![expr.clone()],
+            children: vec![expr],
         };
         e
     }
@@ -99,11 +99,11 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn new_var_init(token: Token, initializer: &Expr) -> Expr {
+    pub fn new_var_init(token: Token, initializer: Expr) -> Expr {
         let e = Expr {
             etype: ExprType::Variable,
             token: token,
-            children: vec![initializer.clone()],
+            children: vec![initializer],
         };
         e
     }
@@ -117,11 +117,11 @@ impl Expr {
         e
     }
 
-    pub fn new_call(_callee: &Expr, token: Token, args: &Vec<Expr>) -> Expr {
+    pub fn new_call(_callee: &Expr, token: Token, args: Vec<Expr>) -> Expr {
         let e = Expr {
             etype: ExprType::Call,
             token: token,
-            children: args.clone(),
+            children: args,
         };
         e
     }

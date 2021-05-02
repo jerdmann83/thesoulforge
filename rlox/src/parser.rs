@@ -91,12 +91,10 @@ impl Parser {
     }
 
     fn peek(&self) -> Token {
-        // todo: return a reference, figure out explicit lifetimes
         self.tokens[*self.current.borrow()].clone()
     }
 
     fn previous(&self) -> Token {
-        // todo: same here
         self.tokens[*self.current.borrow() - 1].clone()
     }
 
@@ -418,7 +416,7 @@ impl Parser {
 
         self.consume(TokenType::RightParen, "expect ')' after args")?;
         let paren = self.previous();
-        Ok(Expr::new_call(callee, paren, &args))
+        Ok(Expr::new_call(callee, paren, args))
     }
 
     fn primary(&self) -> ExprResult {
@@ -441,7 +439,7 @@ impl Parser {
         if self.is_match(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, "expect ')' after expression.")?;
-            return Ok(Expr::new_grouping(&expr));
+            return Ok(Expr::new_grouping(expr));
         }
 
         if self.is_match(&[TokenType::Identifier(String::new())]) {
