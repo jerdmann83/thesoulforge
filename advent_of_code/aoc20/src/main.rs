@@ -10,28 +10,20 @@ struct Tile {
     grid: CharGridT,
     id: u32,
     stable: bool,
-    // posx: Option<u32>,
-    // posy: Option<u32>,
-    // facing in degrees.  0 is right
-    // face: Option<u32>,
 }
 type TileGridT = Vec<Vec<Tile>>;
 
 impl Tile {
-    fn new(g: &CharGridT, id: u32) -> Self {
+    fn new(g: CharGridT, id: u32) -> Self {
         Tile {
-            grid: g.to_vec(),
+            grid: g,
             id: id,
             stable: false,
-            // posx: None,
-            // posy: None,
-            // face: None,
         }
     }
 }
 
 impl fmt::Display for Tile {
-    // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.id)
     }
@@ -50,7 +42,7 @@ fn parse(buf: &str) -> Vec<Tile> {
         if toks.len() == 2 {
             let id: Vec<&str> = toks[1].split(':').collect();
             if cur_id > 0 {
-                out.push(Tile::new(&cur_grid, cur_id));
+                out.push(Tile::new(cur_grid, cur_id));
             }
             cur_id = id[0].parse::<u32>().unwrap();
             cur_grid = vec![];
@@ -61,10 +53,14 @@ fn parse(buf: &str) -> Vec<Tile> {
     }
 
     if cur_grid.len() > 0 {
-        out.push(Tile::new(&cur_grid, cur_id));
+        out.push(Tile::new(cur_grid, cur_id));
     }
 
     out
+}
+
+fn rotate_tile(t: &mut Tile) {
+    t.grid = rotate(&t.grid);
 }
 
 fn rotate(g: &CharGridT) -> CharGridT {
@@ -97,6 +93,53 @@ fn rotate(g: &CharGridT) -> CharGridT {
     out
 }
 
+fn is_horizontal_match(left: &mut CharGridT, right: &mut CharGridT) -> bool {
+    // print_grids(left, right);
+    for y in 0..left.len() {
+        let x = left[y].len() - 1;
+        let lrune = left[y][x];
+        let rrune = right[y][0];
+        if lrune != rrune {
+            return false;
+        }
+    }
+    true
+}
+
+fn is_vertical_match(top: &mut CharGridT, bot: &mut CharGridT) -> bool {
+    // print_grids(top, bot);
+    let y = top[0].len() - 1;
+    for x in 0..top[0].len() - 1 {
+        let trune = top[y][x];
+        let brune = bot[0][x];
+        if trune != brune {
+            return false;
+        }
+    }
+    true
+}
+
+fn is_vertical_match_tile(top: &mut Tile, bot: &mut Tile) -> bool {
+    is_vertical_match(&mut top.grid, &mut bot.grid)
+}
+
+fn is_horizontal_match_tile(left: &mut Tile, right: &mut Tile) -> bool {
+    is_horizontal_match(&mut left.grid, &mut right.grid)
+}
+
+fn try_match(left: &mut CharGridT, right: &mut CharGridT) -> bool {
+    for _i in 0..3 {
+        for _j in 0..3 {
+            if is_horizontal_match(left, right) {
+                return true;
+            }
+            *right = rotate(right);
+        }
+        *left = rotate(left);
+    }
+    return false;
+}
+
 // super lame, learn to Trait this guy
 fn print_grid(v: &TileGridT) {
     for row in v {
@@ -104,6 +147,12 @@ fn print_grid(v: &TileGridT) {
             print!("{} ", tile.id);
         }
         print!("\n");
+    }
+}
+
+fn print_grids(left: &CharGridT, right: &CharGridT) {
+    for i in 0..left.len() {
+        println!("{:?} {:?}", left[i], right[i]);
     }
 }
 
@@ -130,7 +179,9 @@ fn random_layout(tiles: &[Tile]) -> TileGridT {
                 out.push(cur);
                 cur = vec![];
             }
-            cur.push(t.clone());
+            let mut hack = t.clone();
+            shuffle(&mut hack);
+            cur.push(hack);
             count += 1;
         }
     }
@@ -141,25 +192,65 @@ fn random_layout(tiles: &[Tile]) -> TileGridT {
     out
 }
 
-fn shuffle(tiles: &mut TileGridT) {
-    let mut x: u64 = 0;
-    let mut y: u64 = 0;
-    loop {
-        // if x > 0 {
-        // }
+// rotate a tile between 0 and 3 times
+fn shuffle(t: &mut Tile) {
+    let mut rng = thread_rng();
+    let num = rng.gen::<u16>() % 3;
+    for _ in 0..num {
+        rotate_tile(t);
     }
 }
 
-fn shuffle_single(tiles: &mut TileGridT) {}
+fn score_grid(mut tg: TileGridT) -> u32 {
+    let mut y1 = 0;
+    let mut y2 = 1;
+    while y2 < tg.len() {
+        let mut x = 0;
+        while x < tg[y1].len() {
+            if !is_vertical_match_tile(&mut tg[y1][x].clone(), &mut tg[y2][x].clone()) {
+                return 0;
+            }
+            x += 1;
+        }
+        y1 += 1;
+        y2 += 1;
+    }
 
-fn part1(t: &[Tile]) -> Option<u32> {
+    let mut x1 = 0;
+    let mut x2 = 1;
+    while x2 < tg[0].len() {
+        let mut y = 0;
+        while y < tg.len() {
+            if !is_horizontal_match_tile(&mut tg[y][x1].clone(), &mut tg[y][x2].clone()) {
+                return 0;
+            }
+            y += 1;
+        }
+        y1 += 1;
+        y2 += 1;
+    }
+
+    let y = tg.len() - 1;
+    let x = tg[0].len() - 1;
+    tg[0][0].id * tg[y][0].id * tg[y][x].id * tg[0][x].id
+}
+
+fn part1(t: &[Tile]) -> u32 {
+    let mut score: u32;
+    let mut count: u32 = 0;
     loop {
         let rl = random_layout(t);
-
-        break;
+        // print_grid(&rl);
+        score = score_grid(rl);
+        if score > 0 {
+            break;
+        }
+        count += 1;
+        if count % 10000 == 0 {
+            println!("{:?} iterations...", count);
+        }
     }
-    // example: 20899048083289
-    None
+    score
 }
 
 fn main() {
@@ -206,6 +297,31 @@ mod test {
                 ['4', '4', '4'].to_vec(),
             ]
         );
+    }
+
+    #[test]
+    fn test_try_match() {
+        // two grids that match on edge straight away
+        let mut g1: CharGridT = vec![['1', '2'].to_vec(), ['4', '5'].to_vec()];
+        let mut g2: CharGridT = vec![['2', '8'].to_vec(), ['5', '9'].to_vec()];
+        assert!(try_match(&mut g1, &mut g2));
+
+        // one that now won't
+        g2 = vec![['3', '8'].to_vec(), ['6', '9'].to_vec()];
+        assert!(!try_match(&mut g1, &mut g2));
+
+        // two that will if we rotate the grids
+        g1 = vec![['1', '7'].to_vec(), ['4', '2'].to_vec()];
+        g2 = vec![['1', '8'].to_vec(), ['7', '2'].to_vec()];
+        assert!(try_match(&mut g1, &mut g2));
+    }
+
+    #[test]
+    fn test_vertical_match() {
+        let mut g1: CharGridT = vec![['1', '2'].to_vec(), ['4', '5'].to_vec()];
+        let mut g2: CharGridT = vec![['4', '5'].to_vec(), ['3', '9'].to_vec()];
+        assert!(is_vertical_match(&mut g1, &mut g2));
+        assert!(!is_vertical_match(&mut g2, &mut g1));
     }
 
     fn test_part1() {
