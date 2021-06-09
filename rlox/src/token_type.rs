@@ -25,7 +25,7 @@ pub enum TokenType {
     Class,
     Else,
     False,
-    Fun,
+    Func,
     For,
     If,
     Nil,

@@ -29,9 +29,7 @@ impl Wire for WireType {
                 out.push_str(&format!(":{}\r\n", i));
             }
             WireType::BulkString(s) => {
-                let tmp = &format!("${}\r\n{}\r\n", &s.len(), &s);
-                println!("{}", tmp);
-                out.push_str(tmp);
+                out.push_str(&format!("${}\r\n{}\r\n", &s.len(), &s));
             }
             WireType::Array(v) => {
                 out.push_str(&format!("*{}\r\n", v.len()));
@@ -62,8 +60,7 @@ mod tests {
     fn wire_types() {
         let val = WireType::Integer(99);
         let wire_val = val.serialize();
-        assert!(matches!(deserialize(&wire_val), Ok(val)));
-        // assert!(deserialize(&wire_val) == Ok(val));
+        assert!(matches!(deserialize(&wire_val), val));
 
         let val = WireType::Error("ERR: bad stuff".to_string());
         let wire_val = val.serialize();

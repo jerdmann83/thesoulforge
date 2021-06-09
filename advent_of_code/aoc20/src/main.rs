@@ -201,7 +201,7 @@ fn shuffle(t: &mut Tile) {
     }
 }
 
-fn score_grid(mut tg: TileGridT) -> u32 {
+fn score_grid(tg: TileGridT) -> u32 {
     let mut y1 = 0;
     let mut y2 = 1;
     while y2 < tg.len() {
@@ -226,8 +226,8 @@ fn score_grid(mut tg: TileGridT) -> u32 {
             }
             y += 1;
         }
-        y1 += 1;
-        y2 += 1;
+        x1 += 1;
+        x2 += 1;
     }
 
     let y = tg.len() - 1;
@@ -322,6 +322,27 @@ mod test {
         let mut g2: CharGridT = vec![['4', '5'].to_vec(), ['3', '9'].to_vec()];
         assert!(is_vertical_match(&mut g1, &mut g2));
         assert!(!is_vertical_match(&mut g2, &mut g1));
+    }
+
+    #[test]
+    fn test_score_grid() {
+        let mut tg: TileGridT = vec![];
+        let mut id = 10;
+        let mut ids = vec![];
+        for y in 0..2 {
+            tg.push(vec![]);
+            // tiles with grids that fit in any position
+            for x in 0..2 {
+                tg[y].push(Tile::new(
+                    vec![vec!['1', '1'].to_vec(), vec!['1', '1'].to_vec()],
+                    id,
+                ));
+                ids.push(id);
+                id += 1;
+            }
+        }
+        let score = ids.iter().fold(1, |acc, x| x * acc);
+        assert_eq!(score_grid(tg), score);
     }
 
     fn test_part1() {

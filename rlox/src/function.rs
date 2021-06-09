@@ -5,7 +5,7 @@ use crate::value::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LoxFunction {
-    decl: Vec<Stmt>,
+    pub decl: Vec<Stmt>,
 }
 
 impl LoxFunction {

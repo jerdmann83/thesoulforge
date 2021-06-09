@@ -245,9 +245,11 @@ impl Interpreter {
         ))
     }
 
-    fn eval_call(&mut self, _expr: &Expr) -> InterpreterResult {
+    fn eval_call(&mut self, expr: &Expr) -> InterpreterResult {
+        let func = LoxFunction::new(&Stmt::new_expr(expr));
+        if func.decl.len() > 0 {
+        }
         todo!();
-        // let func = LoxFunction::new(expr);
     }
 
     fn eval_logical(&mut self, expr: &Expr) -> InterpreterResult {

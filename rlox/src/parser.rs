@@ -397,6 +397,7 @@ impl Parser {
         Ok(expr)
     }
 
+    // someFunc(1, 2, "x")
     fn finish_call(&self, callee: &Expr) -> ExprResult {
         let mut args = vec![];
 
@@ -461,7 +462,7 @@ impl Parser {
 
             match self.peek().ttype {
                 TokenType::Class
-                | TokenType::Fun
+                | TokenType::Func
                 | TokenType::Var
                 | TokenType::For
                 | TokenType::If
