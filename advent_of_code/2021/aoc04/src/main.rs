@@ -44,13 +44,15 @@ impl Board {
         false
     }
 
+    // set a tile number (if present).
+    // return true if this move creates a bingo for the first time
     fn set(&mut self, num: u32) -> bool {
         for y in 0..self.tiles.len() {
             for x in 0..self.tiles[0].len() {
                 if self.tiles[y][x] == num {
                     self.marks[y][x] = true;
 
-                    if self.is_bingo(y, x) {
+                    if self.is_bingo(y, x) && self.winning_move.is_none() {
                         let mv = Some(self.tiles[y][x]);
                         self.winning_move = mv;
                         return true;
@@ -91,7 +93,6 @@ fn part1(mut game: Game) -> u32 {
     for mv in game.moves {
         for board in &mut game.boards {
             if board.set(mv) {
-                println!("{:?} win!", board);
                 return board.score();
             }
         }
