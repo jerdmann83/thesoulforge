@@ -132,8 +132,8 @@ fn part2(grid: &Grid) -> u32 {
 fn main() {
     let mut buf = String::new();
     stdin().read_to_string(&mut buf).unwrap();
-    let lines = parse(&buf);
+    let grid = parse(&buf);
 
-    println!("part1: {}", part1(&lines));
-    println!("part2: {}", part2(&lines));
+    println!("part1: {}", part1(&grid));
+    println!("part2: {}", part2(&grid));
 }

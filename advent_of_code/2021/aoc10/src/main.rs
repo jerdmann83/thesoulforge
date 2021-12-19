@@ -1,6 +1,6 @@
 use std::io::{stdin, Read};
 
-fn get_points_part1(c: char) -> u32 {
+fn get_points_part1(c: char) -> u64 {
     match c {
         ')' => 3,
         ']' => 57,
@@ -10,7 +10,7 @@ fn get_points_part1(c: char) -> u32 {
     }
 }
 
-fn get_points_part2(c: char) -> u32 {
+fn get_points_part2(c: char) -> u64 {
     match c {
         ')' => 1,
         ']' => 2,
@@ -95,7 +95,7 @@ fn scan(row: &[char]) -> ScanResult {
     return ScanResult::from_stack(toks);
 }
 
-fn part1(n: &Nav) -> u32 {
+fn part1(n: &Nav) -> u64 {
     let mut out = 0;
     for row in n {
         let result = scan(&row);
@@ -104,23 +104,24 @@ fn part1(n: &Nav) -> u32 {
     out
 }
 
-fn part2(n: &Nav) -> u32 {
+fn part2(n: &Nav) -> u64 {
+    let mut scores = vec![];
     for row in n {
         let mut out = 0;
         let result = scan(&row);
         if result.illegal.is_some() {
             continue;
         }
-        println!("{:?}", result.stack);
-        for tok in result.stack.rev() {
+        for tok in result.stack.iter().rev() {
             out *= 5;
-            if let Some(closer) = get_closer(tok) {
+            if let Some(closer) = get_closer(*tok) {
                 out += get_points_part2(closer);
             }
         }
-        println!("{:?}", out);
+        scores.push(out)
     }
-    0
+    scores.sort();
+    scores[scores.len() / 2]
 }
 
 fn main() {
