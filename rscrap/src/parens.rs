@@ -1,5 +1,4 @@
-struct Parens;
-use std::collections::HashMap;
+pub struct Parens;
 
 impl Parens {
     pub fn is_valid(s: &str) -> bool {

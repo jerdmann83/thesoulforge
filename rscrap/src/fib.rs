@@ -16,6 +16,7 @@ pub fn fib_dynamic(n: u64) -> u64 {
     *vals.last().unwrap()
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 

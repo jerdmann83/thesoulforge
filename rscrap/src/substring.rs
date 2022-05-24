@@ -88,6 +88,7 @@ pub fn subsequence(lhs: &str, rhs: &str) -> usize {
     max_val
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 
