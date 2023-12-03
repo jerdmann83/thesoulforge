@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+d=aoc$1
+cargo init aoc$1
+cp template.rs $d/src/main.rs
