@@ -1,5 +1,11 @@
 #!/bin/bash
 set -e
+if [[ -z $1 ]]; then
+	echo "expect two-digit number"
+	exit
+fi
+
 d=aoc$1
 cargo init aoc$1
 cp template.rs $d/src/main.rs
+cd $d
