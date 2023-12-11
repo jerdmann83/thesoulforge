@@ -1,8 +1,6 @@
 use std::io::{stdin, Read};
-use std::collections::HashMap;
 
-type Val = u32;
-type Map = HashMap<Val, Val>;
+type Val = usize;
 
 #[derive(Debug)]
 struct Range {
@@ -14,7 +12,7 @@ struct Range {
 #[derive(Debug)]
 struct Almanac {
     seeds: Vec<Val>,
-    ranges: Vec<Map>,
+    ranges: Vec<Vec<Range>>,
 }
 
 impl Almanac {
@@ -27,16 +25,14 @@ impl Almanac {
     }
 
     fn from_str(s: &str) -> Self {
-// seeds: 79 14 55 13
-//
-// seed-to-soil map:
-// 50 98 2
-// 52 50 48
         let mut seeds : Vec<Val> = vec![];
         let mut ranges = vec![];
         for sect in s.split("\n\n") {
-            println!("almanac: sect");
             let top_toks : Vec<&str> = sect.split(':').collect();
+            if top_toks.len() != 2 {
+                continue;
+            }
+
             let label = top_toks[0];
             if label == "seeds" {
                 seeds = Self::get_numbers(top_toks[1]);
@@ -46,36 +42,30 @@ impl Almanac {
             let vals = Self::get_numbers(top_toks[1]);
             let mut i = 0;
             assert!(vals.len() % 3 == 0);
-            let mut map = Map::new();
+            let mut level_ranges = vec![];
             while i < vals.len() {
                 let dbegin = vals[i];
                 let sbegin = vals[i+1];
                 let len = vals[i+2];
 
-                for range_i in 0..len {
-                    let src = sbegin + range_i;
-                    let dst = dbegin + range_i;
-                    map.insert(src, dst);
-                }
-                println!("almanac: map");
+                level_ranges.push(Range{dbegin, sbegin, len});
                 i += 3;
             }
-            ranges.push(map);
+            ranges.push(level_ranges);
         }
         assert_eq!(ranges.len(), 7);
-        println!("almanac: done");
         Almanac{seeds, ranges}
     }
 
     fn get_loc(&self, seed: Val) -> Val {
-        println!("start seed: {:?}", seed);
         let mut next = seed;
         for r in &self.ranges {
-            println!("enter: {}", next);
-            let rc = r.get(&next);
-            if let Some(val) = rc {
-                next = *val;
-                continue;
+            for sr in r {
+                let send = sr.sbegin + sr.len;
+                if next >= sr.sbegin && next < send {
+                    next = sr.dbegin + (next - sr.sbegin);
+                    break;
+                }
             }
         }
         next
@@ -85,27 +75,40 @@ impl Almanac {
         let mut out : Vec<Val> = vec![];
         for s in &self.seeds {
             let loc = self.get_loc(*s);
-            println!("done. seed {}: loc {}", s, loc);
             out.push(loc);
-            println!("{:?}", out);
+        }
+        out
+    }
+
+    fn get_least_loc_part2(&self) -> usize {
+        let mut idx : usize = 0;
+        let mut out : usize = usize::MAX;
+        while idx < self.seeds.len() {
+            let sbegin = &self.seeds[idx];
+            let len = &self.seeds[idx+1];
+            for s in *sbegin..*sbegin+*len {
+                let loc = self.get_loc(s);
+                out = std::cmp::min(out, loc);
+            }
+            idx += 2;
         }
         out
     }
 }
 
-fn part1(buf: &str) -> u32 {
+fn part1(buf: &str) -> usize {
     let a = Almanac::from_str(buf);
     let locs = a.get_locs();
-    let mut out = 99999999;
-    println!("{:?}", locs);
+    let mut out = usize::MAX;
     for l in locs {
         out = std::cmp::min(l, out);
     }
     out
 }
 
-fn part2(buf: &str) -> u32 {
-    todo!();
+fn part2(buf: &str) -> usize {
+    let a = Almanac::from_str(buf);
+    a.get_least_loc_part2()
 }
 
 fn main() {
@@ -160,6 +163,6 @@ humidity-to-location map:
 
     #[test]
     fn example2() {
-        todo!();
+        assert_eq!(part2(INPUT), 46);
     }
 }
