@@ -1,19 +1,21 @@
 use std::io::{stdin, Read};
 use std::collections::HashMap;
 
+fn dir_idx(dir: char) -> usize {
+    match dir {
+        'L' => return 0,
+        'R' => return 1,
+        _ => unreachable!(),
+    }
+}
+
 fn part1(buf: &str) -> u32 {
     let mut map = Map::from_str(buf);
 
     let mut cur = START;
     while cur != END {
         let dir = map.steps[map.step % map.steps.len()];
-        let idx;
-        match dir {
-            'L' => idx = 0,
-            'R' => idx = 1,
-            _ => unreachable!(),
-        }
-        println!("{:?}", cur);
+        let idx = dir_idx(dir);
         let n = &map.nodes[cur];
         cur = &n[idx];
 
@@ -24,10 +26,29 @@ fn part1(buf: &str) -> u32 {
 
 fn part2(buf: &str) -> u32 {
     let mut map = Map::from_str(buf);
-    // let ghosts = vec![];
-    // for m in map.nodes {
-    // }
-    todo!();
+    let mut ghosts : Vec<String> = vec![];
+    for (n,_) in &map.nodes {
+        if n.ends_with("A") {
+            ghosts.push(n.to_string());
+        }
+    }
+
+    loop {
+        let dir = map.steps[map.step % map.steps.len()];
+        map.step += 1;
+
+        let idx = dir_idx(dir);
+        for gi in 0..ghosts.len() {
+            let g = &mut ghosts[gi];
+            *g = map.nodes[g][idx].clone();
+        }
+
+        if ghosts.iter().all(|g| g.ends_with("Z")) {
+            break;
+        }
+    }
+
+    map.step as u32
 }
 
 type Nodes = HashMap<String, Vec<String>>;
