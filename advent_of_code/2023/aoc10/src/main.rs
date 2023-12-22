@@ -1,6 +1,6 @@
 use std::io::{stdin, Read};
-use std::ops::{Add, AddAssign};
 use std::collections::VecDeque;
+use je::point::Point;
 
 type Grid = Vec<Vec<char>>;
 
@@ -10,37 +10,6 @@ fn parse(buf: &str) -> Grid {
         out.push(l.chars().collect());
     }
     out
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct Point {
-    x: i32,
-    y: i32,
-}
-
-impl Point {
-    fn new(x: i32, y: i32) -> Self {
-        Point{ x, y }
-    }
-}
-
-impl Add for Point {
-    type Output = Self;
-    fn add(self, other: Self) -> Self {
-        Self {
-            x: self.x + other.x,
-            y: self.y + other.y,
-        }
-    }
-}
-
-impl AddAssign for Point {
-    fn add_assign(&mut self, other: Self) {
-        *self = Self{
-            x: self.x + other.x,
-            y: self.y + other.y,
-        };
-    }
 }
 
 fn find(g: &Grid, v: char) -> Point {
@@ -191,8 +160,41 @@ fn part1(buf: &str) -> u32 {
     out
 }
 
+fn regions(g: &Grid) -> Vec<Vec<Point>> {
+    let mut out = vec![];
+    for y in 0..g.len() {
+        for x in 0..g[y].len() {
+            let cur = Point::new(x, y);
+            if seen.contains(cur) {
+                continue;
+            }
+            seen.insert(cur);
+
+            let con = get_connected(&g, &cur);
+
+        }
+    }
+}
+
+fn enclose(g: &Grid) -> u32 {
+    let mut seen = vec![];
+    for y in 0..g.len() {
+        for x in 0..g[y].len() {
+            let cur = Point::new(x, y);
+            if seen.contains(cur) {
+                continue;
+            }
+            seen.insert(cur);
+
+            let con = get_connected(&g, &cur);
+
+        }
+    }
+    todo!();
+}
+
 fn part2(buf: &str) -> u32 {
-    0
+    0 
 }
 
 fn main() {
@@ -240,5 +242,15 @@ LJ...".to_string();
 
     #[test]
     fn example2() {
+        let input = "...........
+.S-------7.
+.|F-----7|.
+.||.....||.
+.||.....||.
+.|L-7.F-J|.
+.|..|.|..|.
+.L--J.L--J.
+...........".to_string();
+        assert_eq!(enclose(&input), 4);
     }
 }

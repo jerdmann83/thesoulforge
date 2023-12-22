@@ -1,11 +1,10 @@
 #!/bin/bash
 set -e
 if [[ -z $1 ]]; then
-	echo "expect two-digit number"
+	echo "expect directory name"
 	exit
 fi
 
-d=aoc$1
-cargo init aoc$1
+d=$1
+cargo init $d
 cp template.rs $d/src/main.rs
-cd $d

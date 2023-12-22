@@ -21,11 +21,9 @@ mod test {
 
     #[test]
     fn example1() {
-        todo!();
     }
 
     #[test]
     fn example2() {
-        todo!();
     }
 }
