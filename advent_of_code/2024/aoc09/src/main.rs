@@ -2,33 +2,25 @@ use std::io::{stdin, Read};
 
 #[derive(Debug)]
 struct Disk {
-    blocks: Vec<char>,
+    blocks: Vec<u32>,
 }
 
-const EMPTY : char = '.';
-
-fn to_digit(c: char) -> Option<u32> {
-    char::to_digit(c, 10)
-}
-fn from_digit(d: u32) -> Option<char> {
-    char::from_digit(d, 10)
-}
+const EMPTY : u32 = u32::MAX;
 
 impl Disk {
     fn from_map(s: &str) -> Self {
         let mut blocks = vec![];
         // 12345
         for (idx,c) in s.chars().enumerate() {
-            let val = to_digit(c);
+            let val = char::to_digit(c, 10);
             if val.is_none() {
                 break;
             }
             let val = val.unwrap();
-            let fill : char;
+            let fill : u32;
             if idx % 2 == 0 {
                 let id = idx / 2;
-                println!("{:?}", id);
-                fill = from_digit(id as u32).unwrap();
+                fill = id as u32;
             } else {
                 fill = EMPTY;
             }
@@ -40,7 +32,7 @@ impl Disk {
     }
 }
 
-fn part1(buf: &str) -> u32 {
+fn part1(buf: &str) -> usize {
     let mut d = Disk::from_map(buf);
     let mut li = 0;
     let mut ri = d.blocks.len() - 1;
@@ -54,7 +46,6 @@ fn part1(buf: &str) -> u32 {
         if li > ri {
             break;
         }
-        println!("swap {} {}", li, ri);
         let tmp = d.blocks[ri];
         d.blocks[li] = tmp;
         d.blocks[ri] = EMPTY;
@@ -62,16 +53,16 @@ fn part1(buf: &str) -> u32 {
         ri -= 1;
     }
 
-    let mut out = 0;
-    for (idx,c) in d.blocks.iter().enumerate() {
-        if *c == EMPTY {
+    let mut out : usize = 0;
+    for (idx,val) in d.blocks.iter().enumerate() {
+        let val = *val;
+        if val == EMPTY {
             break;
         }
 
-        let val = to_digit(*c).unwrap();
-        out += idx as u32 * val;
+        out += idx * val as usize;
     }
-    out as u32
+    out
 }
 
 fn part2(buf: &str) -> u32 {
