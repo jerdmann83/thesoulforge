@@ -50,7 +50,7 @@ fn get_nbr(g: &Grid, p: Point, target: u32) -> Vec<Point> {
     out
 }
 
-fn explore(g: &Grid, start: Point, goal: u32) -> u32 {
+fn explore_v1(g: &Grid, start: Point, goal: u32) -> u32 {
     let mut frontier = vec![start];
     let mut target = get(g, start).unwrap();
     assert!(target == 0);
@@ -68,40 +68,76 @@ fn explore(g: &Grid, start: Point, goal: u32) -> u32 {
         frontier.clear();
 
         if target == goal {
-            println!("done. {:?} -> {:?}", start, nbrs);
             return nbrs.len() as u32;
         }
         for nbr in &nbrs {
             frontier.push(*nbr);
         }
-        println!("ftr. {} -> {:?}", target, nbrs);
     }
     unreachable!();
 }
 
-fn part1(buf: &str) -> u32 {
-    let g = from_buf(buf);
-    let mut heads : Vec<Point> = vec![];
-    let vbegin = 0;
+fn explore_v2(g: &Grid, start: Point, goal: u32) -> u32 {
+    let mut frontier = vec![start];
+    let mut target = get(g, start).unwrap();
+    assert!(target == 0);
+
+    while target < goal {
+        target += 1;
+        // vector of neighbors here
+        // we actually want to count the total number of paths,
+        // not just the number of unique end nodes we hit
+        let mut nbrs = vec![];
+        for cur in &frontier {
+            for nn in get_nbr(g, *cur, target) {
+                nbrs.push(nn);
+            }
+        }
+        frontier.clear();
+
+        if target == goal {
+            return nbrs.len() as u32;
+        }
+        for nbr in &nbrs {
+            frontier.push(*nbr);
+        }
+    }
+    unreachable!();
+}
+
+fn get_starts(g: &Grid) -> Vec<Point> {
+    let mut out : Vec<Point> = vec![];
     for y in 0..g.len() {
         for x in 0..g[y].len() {
             let p = Point::new(x as i32, y as i32);
-            if get(&g, p).unwrap() == vbegin {
-                heads.push(p);
+            if get(&g, p).unwrap() == 0 {
+                out.push(p);
             }
         }
     }
-    println!("hds {:?}", heads);
+    out
+}
+
+fn part1(buf: &str) -> u32 {
+    let g = from_buf(buf);
+    let starts = get_starts(&g);
 
     let mut out = 0;
-    for h in heads {
-        out += explore(&g, h, 9);
+    for h in starts {
+        out += explore_v1(&g, h, 9);
     }
     out
 }
 
 fn part2(buf: &str) -> u32 {
-    todo!();
+    let g = from_buf(buf);
+    let starts = get_starts(&g);
+
+    let mut out = 0;
+    for h in starts {
+        out += explore_v2(&g, h, 9);
+    }
+    out
 }
 
 fn main() {
@@ -172,6 +208,6 @@ mod test {
 32019012
 01329801
 10456732";
-        assert_eq![part1(s), 36];
+        assert_eq![part2(s), 81];
     }
 }
