@@ -13,13 +13,18 @@ fn parse(s: &str) -> Stones {
     out
 }
 
-fn num_digits(mut v: u64) -> usize {
+fn num_digits(mut v: u64) -> u32 {
     let mut out = 0;
     while v > 0 {
         v /= 10;
         out += 1;
     }
     out
+}
+
+const fn pow10(exp: u32) -> u32 {
+    const MANTISSA : u32 = 10;
+    MANTISSA.pow(exp)
 }
 
 fn run_one(s: &Stones, out: &mut Stones) {
@@ -32,8 +37,7 @@ fn run_one(s: &Stones, out: &mut Stones) {
         let digits = num_digits(*st);
         if digits % 2 == 0 {
             let pivot = digits / 2;
-            let scale : u64 = 10;
-            let scale = (scale as u32).pow(pivot as u32);
+            let scale = pow10(pivot);
             let lhs = *st / scale as u64;
             let rhs = *st % scale as u64;
             out.push(lhs);
