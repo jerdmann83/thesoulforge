@@ -2,8 +2,8 @@ use std::ops;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Point {
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -48,5 +48,89 @@ impl ops::Add<Point> for Point {
     type Output = Point;
     fn add(self, rhs: Point) -> Point {
         Point::new(self.x + rhs.x, self.y + rhs.y)
+    }
+}
+
+impl ops::Sub<Point> for Point {
+    type Output = Point;
+    fn sub(self, rhs: Point) -> Point {
+        Point::new(self.x - rhs.x, self.y - rhs.y)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Grid {
+    g: Vec<Vec<char>>,
+}
+
+impl Grid {
+    pub fn from_str(s: &str) -> Self {
+        let mut g = vec![];
+        for l in s.split('\n') {
+            g.push(l.chars().collect());
+        }
+        Self { g }
+    }
+
+    pub fn get(&self, p: Point) -> Option<char> {
+        if p.x < 0 || p.y < 0 
+            || p.x as usize >= self.g[0].len()
+                || p.y as usize >= self.g.len() {
+                    return None;
+                }
+        Some(self.g[p.y as usize][p.x as usize])
+    }
+
+    pub fn get_nbr(&self, p: Point) -> Vec<Point> {
+        let dirs : [Point; 4] = [
+            Point::new(-1, 0),
+            Point::new(1, 0),
+            Point::new(0, -1),
+            Point::new(0, 1)];
+        let mut out = vec![];
+        for d in dirs {
+            let np = p + d;
+            if let Some(_) = self.get(np) {
+                out.push(np);
+            }
+        }
+        out
+    }
+
+    pub fn iter(&self) -> GridIt {
+        GridIt::from_grid(self)
+    }
+}
+
+pub struct GridIt<'a> {
+    pos: Point,
+    grid: &'a Grid,
+}
+
+impl<'a> GridIt<'a> {
+    pub fn from_grid(grid: &'a Grid) -> Self {
+        let pos = Point::new(0, 0);
+        Self { pos, grid }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct GridItem {
+    pub pos: Point,
+    pub val: char,
+}
+
+impl<'a> Iterator for GridIt<'a> {
+    type Item = GridItem;
+    fn next(&mut self) -> Option<Self::Item> {
+        let pos = self.pos;
+        let val = self.grid.get(pos)?;
+
+        self.pos.x += 1;
+        if self.grid.get(self.pos).is_none() {
+            self.pos.x = 0;
+            self.pos.y += 1;
+        }
+        Some(GridItem{ pos, val })
     }
 }
