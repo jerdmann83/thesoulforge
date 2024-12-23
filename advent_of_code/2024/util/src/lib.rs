@@ -60,14 +60,18 @@ impl ops::Sub<Point> for Point {
 
 #[derive(Clone, Debug)]
 pub struct Grid {
-    g: Vec<Vec<char>>,
+    pub g: Vec<Vec<char>>,
 }
 
 impl Grid {
     pub fn from_str(s: &str) -> Self {
         let mut g = vec![];
         for l in s.split('\n') {
-            g.push(l.chars().collect());
+            let row : Vec<char> = l.chars().collect();
+            if row.is_empty() {
+                continue;
+            }
+            g.push(row);
         }
         Self { g }
     }
