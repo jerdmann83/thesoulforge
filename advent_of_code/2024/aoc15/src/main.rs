@@ -73,10 +73,15 @@ struct Map {
     grid: Grid,
     entities: Entities,
     robot: u32,
-    dirty: Vec<u32>,
+    dirty: Vec<(u32, Point)>,
 }
 
 impl Map {
+    pub fn new(grid: Grid, entities: Entities, robot: u32) -> Self {
+        let dirty = vec![];
+        Self{ grid, entities, robot, dirty }
+    }
+
     pub fn get_handle(&self, p: Point) -> Option<u32> {
         if p.x < 0 
             || p.y < 0 
@@ -129,32 +134,40 @@ impl Map {
     }
 
     fn redraw(&mut self) {
-        for y in 0..self.grid.len() {
-            for x in 0..self.grid[y].len() {
-                self.grid[y][x] = NO_ENTITY;
-            }
+        println!("redr: {:?}", self.dirty);
+        for (_, pt) in &self.dirty {
+            self.grid[pt.y as usize][pt.x as usize] = NO_ENTITY;
         }
-        for (_, e) in &self.entities {
+        for (h, _) in &self.dirty {
+            let e = &self.entities[h];
             for cell in e.cells() {
                 self.grid[cell.y as usize][cell.x as usize] = e.handle;
             }
         }
+        self.dirty.clear();
+    }
+
+    fn move_entity(&mut self, h: u32, mov: Point) {
+        // mark the entity's current position as dirty
+        let e = self.entities[&h];
+        self.dirty.push((e.handle, e.pos));
+        println!("moen: {:?}", self.dirty);
+
+        // now update the entity's actual position
+        self.entities.entry(h).and_modify(|e| e.pos = e.pos + mov);
     }
 
     pub fn move_robot(&mut self, d: Dir) {
-        let e = self.entities[&self.robot];
-        let dst = e.pos + from_dir(d);
-        let sh  = self.get_handle(e.pos).unwrap();
+        println!("move: {:?}", d);
+        let robot = self.entities[&self.robot];
+        let dst = robot.pos + from_dir(d);
+        let rh  = self.get_handle(robot.pos).unwrap();
         let dh  = self.get_handle(dst).unwrap_or(0);
-
-        let se = self.entities.get(&sh).unwrap();
         let de = self.entities.get(&dh);
 
         match de {
             None => {
-                let mov = dst;
-                self.entities.entry(sh).and_modify(|se| se.pos = mov);
-                self.dirty.push(sh);
+                self.move_entity(rh, from_dir(d));
             },
             Some(de) => {
                 let mut frontier : VecDeque<Point> = de.cells().into();
@@ -167,22 +180,22 @@ impl Map {
                         continue;
                     }
                     let en = en.unwrap();
-                    self.dirty.push(en.handle);
                     match en.et {
                         EntityType::Box => {
                             boxes.insert(en.handle);
                             for nbr in en.nbrs(d) {
                                 if !frontier.contains(&nbr) {
+                                    println!("frnt add: {:?}", nbr);
                                     frontier.push_back(nbr);
                                 }
                             }
-                        }
+                        },
                         // if any box pushed would hit a wall, we're done
                         EntityType::Wall => {
                             ok = false;
                             frontier.clear();
                             continue;
-                        }
+                        },
                         _ => {},
                     }
                 }
@@ -190,11 +203,9 @@ impl Map {
                 if ok {
                     // move robot and all pushed boxes
                     let mov = from_dir(d);
-                    self.entities.entry(sh).and_modify(|se| se.pos = se.pos + mov);
+                    self.move_entity(rh, mov);
                     for bh in boxes {
-                        self.entities.entry(bh).and_modify(|e| {
-                            e.pos = e.pos + mov;
-                        });
+                        self.move_entity(bh, mov);
                     }
                 }
             }
@@ -280,8 +291,7 @@ fn parse(s: &str) -> ( Map, Moves ) {
         moves.push(mv);
     }
     assert![robot > 0];
-    let dirty = vec![];
-    ( Map { grid, entities, robot, dirty }, moves )
+    ( Map::new(grid, entities, robot), moves )
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
