@@ -1,9 +1,9 @@
 use std::io::{stdin, Read};
-use std::collections::{ HashMap, VecDeque };
+use std::collections::{ HashMap, HashSet, VecDeque };
 use util::Point;
 
 type Grid = Vec<Vec<u32>>;
-type Moves = Vec<char>;
+type Moves = Vec<Dir>;
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum EntityType {
     Robot,
@@ -60,7 +60,8 @@ impl Entity {
         // vertical moves
         let mut out = vec![];
         for x in 0..self.sz {
-            let pt = self.pos + Point::new(x as i32, 0) + mov;
+            let offset = Point::new(x as i32, 0);
+            let pt = self.pos + offset + mov;
             out.push(pt);
         }
         return out;
@@ -148,8 +149,6 @@ impl Map {
 
         let se = self.entities.get(&sh).unwrap();
         let de = self.entities.get(&dh);
-        println!("se: {:?}", se);
-        println!("de: {:?}", de);
 
         match de {
             None => {
@@ -159,8 +158,7 @@ impl Map {
             },
             Some(de) => {
                 let mut frontier : VecDeque<Point> = de.cells().into();
-                let mut boxes = vec![de.handle];
-                println!("first {:?}", boxes);
+                let mut boxes : HashSet<u32> = HashSet::new();
                 let mut ok = true;
                 while frontier.len() > 0 {
                     let pt = frontier.pop_front().unwrap();
@@ -169,12 +167,17 @@ impl Map {
                         continue;
                     }
                     let en = en.unwrap();
+                    self.dirty.push(en.handle);
                     match en.et {
                         EntityType::Box => {
-                            boxes.push(en.handle);
-                            println!("next {:?}", boxes);
-                            frontier.extend(en.nbrs(d));
+                            boxes.insert(en.handle);
+                            for nbr in en.nbrs(d) {
+                                if !frontier.contains(&nbr) {
+                                    frontier.push_back(nbr);
+                                }
+                            }
                         }
+                        // if any box pushed would hit a wall, we're done
                         EntityType::Wall => {
                             ok = false;
                             frontier.clear();
@@ -185,19 +188,32 @@ impl Map {
                 }
 
                 if ok {
-                    for bh in boxes.iter().rev() {
-                        self.entities.entry(*bh).and_modify(|e| {
-                            println!("{:?} add {:?}", e, from_dir(d));
-                            e.pos = e.pos + from_dir(d)
+                    // move robot and all pushed boxes
+                    let mov = from_dir(d);
+                    self.entities.entry(sh).and_modify(|se| se.pos = se.pos + mov);
+                    for bh in boxes {
+                        self.entities.entry(bh).and_modify(|e| {
+                            e.pos = e.pos + mov;
                         });
                     }
                 }
-            },
-            _ => return,
+            }
         }
 
         self.redraw();
     }
+
+    fn score(&self) -> u32 {
+        let mut out = 0;
+        for (_handle, e) in &self.entities {
+            if e.et != EntityType::Box {
+                continue;
+            }
+            out += (e.pos.y * 100) + e.pos.x;
+        }
+        out as u32
+    }
+
 }
 
 fn parse(s: &str) -> ( Map, Moves ) {
@@ -252,23 +268,20 @@ fn parse(s: &str) -> ( Map, Moves ) {
         grid.push(row);
     }
 
-    let moves : Moves = chunks[1].chars().collect();
+    let mut moves : Moves = vec![];
+    for c in chunks[1].chars() {
+        let mv = match c {
+            '^' => Dir::Up,
+            'v' => Dir::Down,
+            '<' => Dir::Left,
+            '>' => Dir::Right,
+            _ => continue,
+        };
+        moves.push(mv);
+    }
     assert![robot > 0];
     let dirty = vec![];
     ( Map { grid, entities, robot, dirty }, moves )
-}
-
-fn score(g: &Grid) -> u32 {
-    let mut out = 0;
-    for y in 0..g.len() {
-        for x in 0..g[y].len() {
-            // match g[y][x] {
-            //     'O' => out += (100 * y) + x,
-            //     _ => {},
-            // }
-        }
-    }
-    out as u32
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -288,33 +301,18 @@ fn from_dir(d: Dir) -> Point {
     }
 }
 
-fn part2(buf: &str) -> u32 {
+fn solve(buf: &str) -> u32 {
     let (mut m, moves) = parse(buf);
     for mv in &moves {
-        let dir : Dir;
-        match mv {
-            '<' => dir = Dir::Left,
-            '>' => dir = Dir::Right,
-            '^' => dir = Dir::Up,
-            'v' => dir = Dir::Down,
-            _ => continue,
-        }
-
-        let dir = from_dir(dir);
-        let pt = m.get_robot_pos() + dir;
-        let next = m.get_entity(pt);
-        if next.is_none() {
-            continue;
-        }
+        m.move_robot(*mv);
     }
-
-    score(&m.grid)
+    m.score()
 }
 
 fn main() {
     let mut buf = String::new();
     stdin().read_to_string(&mut buf).unwrap();
-    println!("part2: {}", part2(&buf));
+    println!("solve: {}", solve(&buf));
 }
 
 #[cfg(test)]
@@ -323,20 +321,23 @@ mod test {
 
     #[test]
     fn example2() {
-        let s = "#######
-#...#.#
-#.....#
-#..OO@#
-#..O..#
-#.....#
-#######
+        let s = "##########
+#..O..O.O#
+#......O.#
+#.OO..O.O#
+#..O@..O.#
+#O#..O...#
+#O..O..O.#
+#.OO.O.OO#
+#....O...#
+##########
 
-<vv<<^^<<^^";
-        assert_eq![part2(s), 9021];
+<vv>^<v^>v>^vv^v>v<>v^v<v<^vv<<<^><<><>>v<vvv<>^v^>^<<<><<v<<<v^vv^v>^vvv<<^>^v^^><<>>><>^<<><^vv^^<>vvv<>><^^v>^>vv<>v<<<<v<^v>^<^^>>>^<v<v><>vv>v^v^<>><>>>><^^>vv>v<^^^>>v^v^<^^>v^^>v^<^v>v<>>v^v^<v>v^^<^^vv<<<v<^>>^^^^>>>v^<>vvv^><v<<<>^^^vv^<vvv>^>v<^^^^v<>^>vvvv><>>v^<<^^^^^^><^><>>><>^^<<^^v>>><^<v>^<vv>>v>>>^v><>^v><<<<v>>v<v<v>vvv>^<><<>^><^>><>^v<><^vvv<^^<><v<<<<<><^v<<<><<<^^<v<^^^><^>>^<v^><<<^>>^v<v^v<v^>^>>^v>vv>^<<^v<>><<><<v<<v><>v<^vv<<<>^^v^>^^>>><<^v>>v^v><^^>>^<>vv^<><^^>^^^<><vvvvv^v<v<<>^v<v>v<<^><<><<><<<^^<<<^<<>><<><^^^>^^<>^>v<>^^>vv<^v^v<vv>^<><v<^v>^^^>>>^^vvv^>vvv<>>>^<^>>>>>^<<^v>^vvv<>^<><<v>v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
+        assert_eq![solve(s), 9021];
     }
 
     #[test]
-    fn test_moves() {
+    fn moves() {
         let s = "#######
 #...#.#
 #.....#
@@ -361,5 +362,21 @@ mod test {
         m.print();
         m.move_robot(Dir::Down);
         m.print();
+    }
+
+    #[test]
+    fn score() {
+        let s = "#######
+#....O#
+#.....#
+#....@#
+#.....#
+#.....#
+#######
+
+^<<";
+        let (m, _moves) = parse(s);
+        m.print();
+        println!("{:?}", m.score());
     }
 }
