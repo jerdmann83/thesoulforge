@@ -86,8 +86,21 @@ fn part1(buf: &str) -> u32 {
         }
         let nways = m.get_ways(pos);
         for (np, ndir, _c) in nways {
-            let nturn = if dir == ndir { 0 } else { 1 };
+            let nturn : u32;
+            if dir == ndir { 
+                nturn = 0;
+            } else { 
+                let dp = Point::from_dir(dir);
+                let ndp = Point::from_dir(ndir);
+                if (dp.x == 0 && ndp.x == 0)
+                    || (dp.y == 0 && ndp.y == 0) {
+                    nturn = 2;
+                } else {
+                    nturn = 1;
+                }
+            }
             frontier.push_back((np, ndir, steps + 1, turns + nturn));
+            println!("frnt add: {:?}", np);
         }
     }
     best
@@ -111,9 +124,32 @@ mod test {
     #[test]
     fn simple() {
         let s = "#####
+#S.E#
+#####";
+        // zero turns needed
+        assert_eq![part1(s), 2];
+
+        let s = "#####
 #E.S#
 #####";
-        assert_eq![part1(s), 1002];
+        // two turns as start facing is east
+        assert_eq![part1(s), 2002];
+    }
+
+    #[test]
+    fn split() {
+        let s = "#######
+#S....#
+#.###.#
+#....E#
+#######";
+        assert_eq![part1(s), 2];
+
+        let s = "#####
+#E.S#
+#####";
+        // two turns as start facing is east
+        assert_eq![part1(s), 2002];
     }
 
     #[test]
