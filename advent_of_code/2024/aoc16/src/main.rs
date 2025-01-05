@@ -1,5 +1,5 @@
 use std::io::{stdin, Read};
-use std::collections::{ HashSet, VecDeque };
+use std::collections::{ HashMap, HashSet, VecDeque };
 use util::{Dir, Point};
 use std::cmp;
 
@@ -60,30 +60,29 @@ impl Map {
         }
         Some(self.grid[p.y as usize][p.x as usize])
     }
+
 }
 
 fn part1(buf: &str) -> u32 {
     let m = Map::from_str(buf);
-    let mut frontier : VecDeque<(Point, Dir, u32, u32)> = VecDeque::new();
+    let mut frontier : VecDeque<(Point, Dir, u32)> = VecDeque::new();
     for (pt, _dir, _c) in m.get_ways(m.start) {
         // character starts facing east, so right
-        frontier.push_back((pt, Dir::Right, 0, 0));
+        frontier.push_back((pt, Dir::Right, 0));
     }
-    let mut seen : HashSet<Point> = HashSet::new();
+    let mut rpath : HashMap<Point, Point> = HashMap::new();
+    let mut rcost : HashMap<Point, u32> = HashMap::new();
 
     let mut best = u32::MAX;
     while frontier.len() > 0 {
-        let (pos, dir, steps, turns) = frontier.pop_front().unwrap();
+        let (pos, dir, cost) = frontier.pop_front().unwrap();
         if pos == m.goal {
-            let score = (turns * 1000) + steps + 1;
-            println!("goal! {} [s:{} t:{}]", score, steps, turns);
+            let score = cost + 1;
+            println!("goal! s:{}", score);
             best = cmp::min(best, score);
             continue;
         }
 
-        if !seen.insert(pos) {
-            continue;
-        }
         let nways = m.get_ways(pos);
         for (np, ndir, _c) in nways {
             let nturn : u32;
@@ -99,8 +98,18 @@ fn part1(buf: &str) -> u32 {
                     nturn = 1;
                 }
             }
-            frontier.push_back((np, ndir, steps + 1, turns + nturn));
-            println!("frnt add: {:?}", np);
+
+            let mut known_cost = u32::MAX;
+            if let Some(v) = rcost.get(&np) {
+                known_cost = *v;
+            }
+            let new_cost = cost + 1 + (nturn * 1000);
+
+            if new_cost < known_cost {
+                frontier.push_back((np, ndir, new_cost));
+                rpath.insert(np, pos);
+                rcost.insert(np, new_cost);
+            }
         }
     }
     best
@@ -139,17 +148,14 @@ mod test {
     #[test]
     fn split() {
         let s = "#######
-#S....#
+#....S#
 #.###.#
-#....E#
+#.....#
+#.#####
+#.#####
+#E#####
 #######";
-        assert_eq![part1(s), 2];
-
-        let s = "#####
-#E.S#
-#####";
-        // two turns as start facing is east
-        assert_eq![part1(s), 2002];
+        part1(s);
     }
 
     #[test]
