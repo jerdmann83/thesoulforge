@@ -65,15 +65,13 @@ impl Map {
     }
 
     fn search(&self) -> (u32, Paths) {
-        // let mut rpath : Nodes = HashMap::new();
         let mut rcost : HashMap<Point, u32> = HashMap::new();
-        // rpath.insert(self.start, vec![Point::new(-1, -1)]);
         rcost.insert(self.start, 0);
 
-        let mut all_paths = vec![];
+        let mut all_paths : Vec<(Path, u32)> = vec![];
         let mut frontier : VecDeque<(Point, Dir, u32, Vec<Point>)> = VecDeque::new();
         // character starts facing east, so right
-        frontier.push_back((self.start, Dir::Right, 0, vec![]));
+        frontier.push_back((self.start, Dir::Right, 0, vec![self.start]));
 
         while frontier.len() > 0 {
             let (pos, dir, cost, path) = frontier.pop_front().unwrap();
@@ -105,20 +103,23 @@ impl Map {
                 }
                 let new_cost = cost + 1 + (nturn * 1000);
 
-                if new_cost < known_cost {
+                // <= cmp because we want duplicate best paths
+                if new_cost <= known_cost {
                     let mut npath = path.clone();
                     npath.push(np);
                     frontier.push_back((np, ndir, new_cost, npath));
-                    // rpath.entry(np).or_insert(vec![]).push(pos);
                     rcost.insert(np, new_cost);
                 }
             }
         }
 
+        // filter down all discovered paths to just the best one(s)
+        // two passes.  find the best score
         let mut best = u32::MAX;
         for (_, cost) in &all_paths {
             best = cmp::min(best, *cost);
         }
+        // find all paths at said best score
         let mut paths = vec![];
         for (path, cost) in &all_paths {
             if *cost == best {
@@ -138,6 +139,7 @@ fn part2(buf: &str) -> u32 {
     let m = Map::from_str(buf);
     let paths = m.search().1;
     let mut all_points = HashSet::new();
+    println!("paths: {}", paths.len());
     for path in paths {
         for pt in path {
             all_points.insert(pt);
@@ -174,15 +176,14 @@ mod test {
 
     #[test]
     fn split() {
-        let s = "#######
-#....S#
-#.###.#
-#.....#
-#.#####
-#.#####
-#E#####
-#######";
-        part1(s);
+        let s = "#####
+#...#
+#S#E#
+#...#
+#####";
+        let m = Map::from_str(s);
+        let r = m.search();
+        assert_eq![r.1.len(), 2];
     }
 
     #[test]
