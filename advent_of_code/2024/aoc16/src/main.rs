@@ -13,6 +13,9 @@ struct Map {
 const START : char = 'S';
 const GOAL  : char = 'E';
 
+type Path = Vec<Point>;
+type Paths = Vec<Path>;
+
 impl Map {
     fn from_str(s: &str) -> Self {
         let mut grid: Grid = vec![];
@@ -61,62 +64,86 @@ impl Map {
         Some(self.grid[p.y as usize][p.x as usize])
     }
 
+    fn search(&self) -> (u32, Paths) {
+        // let mut rpath : Nodes = HashMap::new();
+        let mut rcost : HashMap<Point, u32> = HashMap::new();
+        // rpath.insert(self.start, vec![Point::new(-1, -1)]);
+        rcost.insert(self.start, 0);
+
+        let mut all_paths = vec![];
+        let mut frontier : VecDeque<(Point, Dir, u32, Vec<Point>)> = VecDeque::new();
+        // character starts facing east, so right
+        frontier.push_back((self.start, Dir::Right, 0, vec![]));
+
+        while frontier.len() > 0 {
+            let (pos, dir, cost, path) = frontier.pop_front().unwrap();
+            if pos == self.goal {
+                println!("goal! s:{}", cost);
+                all_paths.push((path, cost));
+                continue;
+            }
+
+            let nways = self.get_ways(pos);
+            for (np, ndir, _c) in nways {
+                let nturn : u32;
+                if dir == ndir { 
+                    nturn = 0;
+                } else { 
+                    let dp = Point::from_dir(dir);
+                    let ndp = Point::from_dir(ndir);
+                    if (dp.x == 0 && ndp.x == 0)
+                        || (dp.y == 0 && ndp.y == 0) {
+                        nturn = 2;
+                    } else {
+                        nturn = 1;
+                    }
+                }
+
+                let mut known_cost = u32::MAX;
+                if let Some(v) = rcost.get(&np) {
+                    known_cost = *v;
+                }
+                let new_cost = cost + 1 + (nturn * 1000);
+
+                if new_cost < known_cost {
+                    let mut npath = path.clone();
+                    npath.push(np);
+                    frontier.push_back((np, ndir, new_cost, npath));
+                    // rpath.entry(np).or_insert(vec![]).push(pos);
+                    rcost.insert(np, new_cost);
+                }
+            }
+        }
+
+        let mut best = u32::MAX;
+        for (_, cost) in &all_paths {
+            best = cmp::min(best, *cost);
+        }
+        let mut paths = vec![];
+        for (path, cost) in &all_paths {
+            if *cost == best {
+                paths.push(path.clone());
+            }
+        }
+        (best, paths)
+    }
 }
 
 fn part1(buf: &str) -> u32 {
     let m = Map::from_str(buf);
-    let mut frontier : VecDeque<(Point, Dir, u32)> = VecDeque::new();
-    for (pt, _dir, _c) in m.get_ways(m.start) {
-        // character starts facing east, so right
-        frontier.push_back((pt, Dir::Right, 0));
-    }
-    let mut rpath : HashMap<Point, Point> = HashMap::new();
-    let mut rcost : HashMap<Point, u32> = HashMap::new();
-
-    let mut best = u32::MAX;
-    while frontier.len() > 0 {
-        let (pos, dir, cost) = frontier.pop_front().unwrap();
-        if pos == m.goal {
-            let score = cost + 1;
-            println!("goal! s:{}", score);
-            best = cmp::min(best, score);
-            continue;
-        }
-
-        let nways = m.get_ways(pos);
-        for (np, ndir, _c) in nways {
-            let nturn : u32;
-            if dir == ndir { 
-                nturn = 0;
-            } else { 
-                let dp = Point::from_dir(dir);
-                let ndp = Point::from_dir(ndir);
-                if (dp.x == 0 && ndp.x == 0)
-                    || (dp.y == 0 && ndp.y == 0) {
-                    nturn = 2;
-                } else {
-                    nturn = 1;
-                }
-            }
-
-            let mut known_cost = u32::MAX;
-            if let Some(v) = rcost.get(&np) {
-                known_cost = *v;
-            }
-            let new_cost = cost + 1 + (nturn * 1000);
-
-            if new_cost < known_cost {
-                frontier.push_back((np, ndir, new_cost));
-                rpath.insert(np, pos);
-                rcost.insert(np, new_cost);
-            }
-        }
-    }
-    best
+    m.search().0
 }
 
-fn part2(_buf: &str) -> u32 {
-    todo!();
+fn part2(buf: &str) -> u32 {
+    let m = Map::from_str(buf);
+    let paths = m.search().1;
+    let mut all_points = HashSet::new();
+    for path in paths {
+        for pt in path {
+            all_points.insert(pt);
+        }
+    }
+    all_points.len() as u32
 }
 
 fn main() {
@@ -180,5 +207,23 @@ mod test {
 
     #[test]
     fn example2() {
+        let s = "#################
+#...#...#...#..E#
+#.#.#.#.#.#.#.#.#
+#.#.#.#...#...#.#
+#.#.#.#.###.#.#.#
+#...#.#.#.....#.#
+#.#.#.#.#.#####.#
+#.#...#.#.#.....#
+#.#.#####.#.###.#
+#.#.#.......#...#
+#.#.###.#####.###
+#.#.#...#.....#.#
+#.#.#.#####.###.#
+#.#.#.........#.#
+#.#.#.#########.#
+#S#.............#
+#################";
+            assert_eq![part2(s), 64];
     }
 }
