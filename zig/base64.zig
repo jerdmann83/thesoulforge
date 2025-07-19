@@ -1,5 +1,4 @@
 const std = @import("std");
-const printf = std.debug.print;
 
 const Base64 = struct {
     table: *const [64]u8,

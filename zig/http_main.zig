@@ -1,22 +1,21 @@
 const std = @import("std");
 
+const Connection = std.net.Server.Connection;
+const StaticStringMap = std.static_string_map.StaticStringMap;
+
 const http_server = @import("http_server.zig");
 const http_cfg = @import("http_config.zig");
 const http_buf = @import("http_buffer.zig");
 const http_request = @import("http_request.zig");
 
-const Connection = std.net.Server.Connection;
-const StaticStringMap = std.static_string_map.StaticStringMap;
-
-const printf = std.debug.print;
+const print = std.debug.print;
 const bufPrint = std.fmt.bufPrint;
-
-const testing = std.testing;
 
 const Method = enum {
     GET,
-    pub fn init(str: []const u8) !Method {
-        return MethodMap.get(str).?;
+    POST,
+    pub fn init(str: []const u8) ?Method {
+        return MethodMap.get(str);
     }
     pub fn is_supported(str: []const u8) bool {
         const method = MethodMap.get(str);
@@ -27,13 +26,15 @@ const Method = enum {
     }
 };
 const MethodMap = StaticStringMap(Method).initComptime(.{
-    .{ "GET", Method.GET },
+    .{ "GET",  Method.GET },
+    .{ "POST", Method.POST },
 });
 
 test "method_map" {
     // get => ?V
-    try testing.expectEqual(Method.GET, MethodMap.get("GET"));
-    try testing.expectEqual(null,       MethodMap.get("FOO"));
+    try std.testing.expectEqual(Method.GET,  MethodMap.get("GET"));
+    try std.testing.expectEqual(Method.POST, MethodMap.get("POST"));
+    try std.testing.expectEqual(null,        MethodMap.get("FOO"));
 }
 
 // terrible name for an allocator/hashmap-backed request
@@ -93,6 +94,10 @@ const RequestSection = enum {
     Body
 };
 
+const ParseError = error {
+    NoMethod,
+};
+
 fn parse_request(text: []const u8) !Request {
     var lineIt = std.mem.splitSequence(u8, text, "\n");
     var lineno : u32 = 0;
@@ -101,11 +106,15 @@ fn parse_request(text: []const u8) !Request {
     var hdrno : u32 = 0;
     while (lineIt.next()) |line| {
         if (lineno == 0) {
+            print("{s}\n", .{line});
             var tokIt = std.mem.tokenizeSequence(u8, line, " ");
-            const method = try Method.init(tokIt.next().?);
-            const uri = tokIt.next().?;
-            const version = tokIt.next().?;
-            out = Request.init(method, uri, version);
+            const smethod = tokIt.next() orelse "";
+            const method = Method.init(smethod);
+            if (method == null) return ParseError.NoMethod;
+
+            const uri = tokIt.next() orelse "";
+            const version = tokIt.next() orelse "";
+            out = Request.init(method.?, uri, version);
 
             lineno += 1;
             sect = RequestSection.Headers;
@@ -143,7 +152,7 @@ test "parse" {
     \\Accept: */*
    ; 
     const r = try parse_request(text);
-    const expect = testing.expectEqualStrings;
+    const expect = std.testing.expectEqualStrings;
     try expect(r.headers[0][0], "Host");
     try expect(r.headers[0][1], "localhost:3490");
     try expect(r.headers[1][0], "User-Agent");
@@ -151,6 +160,8 @@ test "parse" {
     try expect(r.headers[2][0], "Accept");
     try expect(r.headers[2][1], "*/*");
 }
+
+// var ResponseCodeMap = 
 
 const ResponseMap = StaticStringMap([]const u8).initComptime(.{
     .{ "200", (
@@ -177,13 +188,22 @@ pub fn send_response(code: []const u8, conn: Connection) !void {
 
 pub fn main() !u8 {
     const socket = try http_cfg.Socket.init();
-    printf("Socket {any}\n", .{ socket });
+    print("Socket {any}\n", .{ socket });
     var server = try socket.address.listen(.{ .reuse_address = true });
     var buf = http_buf.make_buffer(1024);
     while (true) {
         const conn = try server.accept();
         _ = try http_request.read_request(conn, &buf);
-        try send_response("200", conn);
+        const req = parse_request(&buf) catch |err| {
+            print("error: caught {any}\n", .{ err });
+            conn.stream.close();
+            continue;
+        };
+        if (std.mem.eql(u8, req.uri, "/")) {
+            try send_response("200", conn);
+        } else {
+            try send_response("404", conn);
+        }
         conn.stream.close();
     }
     return 0;

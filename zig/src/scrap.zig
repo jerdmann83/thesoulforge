@@ -1,5 +1,5 @@
 const std = @import("std");
-const printf = std.debug.print;
+const print = std.debug.print;
 
 const Data = struct {
     f: i32,
@@ -11,9 +11,9 @@ const Data = struct {
 
 fn print_data(d: ?Data) void {
     if (d) |data| {
-        printf("{any}\n", .{ data });
+        print("{any}\n", .{ data });
     } else {
-        printf("{any}\n", .{ d });
+        print("{any}\n", .{ d });
     }
 }
 
