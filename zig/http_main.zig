@@ -1,11 +1,16 @@
 const std = @import("std");
+
 const http_server = @import("http_server.zig");
 const http_cfg = @import("http_config.zig");
 const http_buf = @import("http_buffer.zig");
 const http_request = @import("http_request.zig");
-const Map = std.static_string_map.StaticStringMap;
+
+const Connection = std.net.Server.Connection;
+const StaticStringMap = std.static_string_map.StaticStringMap;
 
 const printf = std.debug.print;
+const bufPrint = std.fmt.bufPrint;
+
 const testing = std.testing;
 
 const Method = enum {
@@ -21,14 +26,14 @@ const Method = enum {
         return false;
     }
 };
-const MethodMap = Map(Method).initComptime(.{
+const MethodMap = StaticStringMap(Method).initComptime(.{
     .{ "GET", Method.GET },
 });
 
 test "method_map" {
     // get => ?V
     try testing.expectEqual(Method.GET, MethodMap.get("GET"));
-    try testing.expectEqual(null, MethodMap.get("FOO"));
+    try testing.expectEqual(null,       MethodMap.get("FOO"));
 }
 
 // terrible name for an allocator/hashmap-backed request
@@ -147,6 +152,29 @@ test "parse" {
     try expect(r.headers[2][1], "*/*");
 }
 
+const ResponseMap = StaticStringMap([]const u8).initComptime(.{
+    .{ "200", (
+        "HTTP/1.1 200 OK\nContent-Length: 48"
+        ++ "\nContent-Type: text/html\n"
+        ++ "Connection: Closed\n\n<html><body>"
+        ++ "<h1>Hello, World!</h1></body></html>"
+    )},
+    .{ "404", (
+        "HTTP/1.1 404 Not Found\nContent-Length: 50"
+        ++ "\nContent-Type: text/html\n"
+        ++ "Connection: Closed\n\n<html><body>"
+        ++ "<h1>File not found!</h1></body></html>"
+    )},
+});
+pub fn get_response_message(code: []const u8) ?[]const u8 {
+    return ResponseMap.get(code);
+}
+
+pub fn send_response(code: []const u8, conn: Connection) !void {
+    const msg = get_response_message(code) orelse unreachable;
+    _ = try conn.stream.write(msg);
+}
+
 pub fn main() !u8 {
     const socket = try http_cfg.Socket.init();
     printf("Socket {any}\n", .{ socket });
@@ -155,7 +183,7 @@ pub fn main() !u8 {
     while (true) {
         const conn = try server.accept();
         _ = try http_request.read_request(conn, &buf);
-        printf("Conn {any} got request {s}\n", .{ conn, buf });
+        try send_response("200", conn);
         conn.stream.close();
     }
     return 0;
