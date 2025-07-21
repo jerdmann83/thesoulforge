@@ -123,6 +123,7 @@ impl Map {
         let mut paths = vec![];
         for (path, cost) in &all_paths {
             if *cost == best {
+                println!("best: {:?}", path);
                 paths.push(path.clone());
             }
         }
@@ -204,6 +205,7 @@ mod test {
 #S..#.....#...#
 ###############";
             assert_eq![part1(s), 7036];
+            assert_eq![part2(s), 45];
     }
 
     #[test]

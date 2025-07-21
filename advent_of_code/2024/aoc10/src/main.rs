@@ -1,5 +1,5 @@
 use std::io::{stdin, Read};
-use util::Point;
+use util::{Grid, Point};
 use std::collections::HashSet;
 
 // using a C-style, struct + functions taking that struct approach

@@ -83,8 +83,17 @@ fn part1(buf: &str) -> u32 {
 }
 
 fn part2(buf: &str) -> u32 {
-    todo!();
+    let g = Grid::from_str(buf);
+    let r = get_regions(&g);
+    let mut out = 0;
+    for reg in r {
+        let per = perimeter(&g, &reg);
+        let area = reg.points.len() as u32;
+        out += area * per;
+    }
+    out
 }
+
 
 fn main() {
     let mut buf = String::new();
@@ -126,4 +135,16 @@ MIIISIJEEE
 MMMISSJEEE";
         assert_eq![part1(s), 1930];
     }
+
+    #[test]
+    fn test_part2() {
+        let s = "EEEEE
+EXXXX
+EEEEE
+EXXXX
+EEEEE";
+        assert_eq![part2(s), 368];
+    }
+
+
 }

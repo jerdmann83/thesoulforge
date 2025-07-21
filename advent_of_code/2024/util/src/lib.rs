@@ -6,7 +6,7 @@ pub struct Point {
     pub y: i32,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Dir {
     Up,
     Left,
@@ -20,15 +20,18 @@ impl Point {
     }
     pub fn from_dir(d: Dir) -> Self {
         match d {
-            // TODO: the upside-down nature of my grid parse means both
-            // the up/down directions as well as the left-right rotate are
-            // reversed from what might be more intuitive 
-            // what's the idiomatic way to do this in 2d games programming?
-            Dir::Up => Self::new(0, -1),
-            Dir::Down => Self::new(0, 1),
+            Dir::Up => Self::new(0, 1),
+            Dir::Down => Self::new(0, -1),
             Dir::Left => Self::new(-1, 0),
             Dir::Right => Self::new(1, 0),
         }
+    }
+    pub fn all_dirs() -> Vec<Dir> {
+        vec![Dir::Up,
+            Dir::Down,
+            Dir::Left,
+            Dir::Right,
+        ]
     }
     pub fn rotate(&mut self, d: Dir) {
         let prev = self.clone();

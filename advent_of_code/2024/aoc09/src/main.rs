@@ -7,6 +7,12 @@ struct Disk {
 
 const EMPTY : u32 = u32::MAX;
 
+#[derive(Debug, PartialEq)]
+struct FatPtr {
+    pos: usize,
+    len: usize,
+}
+
 impl Disk {
     fn from_map(s: &str) -> Self {
         let mut blocks = vec![];
@@ -30,6 +36,55 @@ impl Disk {
         }
         Self { blocks }
     }
+
+
+    fn find_block(&self, t: u32) -> Option<FatPtr> {
+        let mut li = 0;
+        let mut in_target = false;
+        while li < self.blocks.len() {
+            if self.blocks[li] == t {
+                in_target = true;
+                li += 1;
+                continue;
+            }
+            li += 1;
+        }
+        if li >= self.blocks.len() {
+            return None;
+        }
+        let mut ri = li + 1;
+        while ri < self.blocks.len() {
+            println!("ri {:?}", ri);
+            if self.blocks[ri] != t {
+                continue;
+            }
+            ri += 1;
+        }
+        let len = ri - li + 1;
+        Some(FatPtr{ pos: li, len })
+    }
+
+    fn find_block_rev(&self, t: u32) -> Option<FatPtr> {
+        let mut ri = (self.blocks.len() - 1) as i64;
+        while ri > -1 {
+            if self.blocks[ri as usize] != t {
+                continue;
+            }
+            ri -= 1;
+        }
+        if ri < 0 {
+            return None;
+        }
+        let mut li = ri;
+        while li > -1 {
+            if self.blocks[li as usize] != t {
+                continue;
+            }
+            li += 1;
+        }
+        let len = (ri - li + 1) as usize;
+        Some(FatPtr{ pos: li as usize, len })
+    }
 }
 
 fn part1(buf: &str) -> usize {
@@ -43,6 +98,8 @@ fn part1(buf: &str) -> usize {
         while d.blocks[ri] == EMPTY {
             ri -= 1;
         }
+        // TODO: probably a more elegant way to write this loop?
+        // I don't love having the bounds-check condition in two places...
         if li > ri {
             break;
         }
@@ -65,8 +122,15 @@ fn part1(buf: &str) -> usize {
     out
 }
 
-fn part2(buf: &str) -> u32 {
-    todo!();
+fn part2(buf: &str) -> usize {
+    let mut d = Disk::from_map(buf);
+    let mut li = 0;
+    let mut ri = d.blocks.len() - 1;
+    while li < ri {
+    }
+
+    let mut out = 0;
+    out
 }
 
 fn main() {
@@ -81,6 +145,16 @@ mod test {
     use super::*;
 
     #[test]
+    fn find() {
+        let s = "2333133121414131402";
+        let d = Disk::from_map(s);
+        let lp = d.find_block(1).unwrap();
+        let rp = d.find_block(1).unwrap();
+        println!("{:?} {:?}", lp, rp);
+        assert_eq![lp, rp];
+    }
+
+    #[test]
     fn example1() {
         let s = "2333133121414131402";
         assert_eq![part1(s), 1928];
@@ -88,5 +162,7 @@ mod test {
 
     #[test]
     fn example2() {
+        let s = "2333133121414131402";
+        assert_eq![part2(s), 2858];
     }
 }
