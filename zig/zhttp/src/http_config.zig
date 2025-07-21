@@ -5,9 +5,8 @@ pub const Socket = struct {
     address: std.net.Address,
     stream: std.net.Stream,
 
-    pub fn init() !Socket {
+    pub fn init(port: u16) !Socket {
         const host = [4]u8 { 127, 0, 0, 1 };
-        const port = 3490;
         const addr = net.Address.initIp4(host, port);
         const socket = try std.posix.socket(
             addr.any.family,

@@ -1,15 +1,8 @@
 const std = @import("std");
-
 const Connection = std.net.Server.Connection;
 const StaticStringMap = std.static_string_map.StaticStringMap;
 
-const http_server = @import("http_server.zig");
-const http_cfg = @import("http_config.zig");
-const http_buf = @import("http_buffer.zig");
-const http_request = @import("http_request.zig");
-
 const print = std.debug.print;
-const bufPrint = std.fmt.bufPrint;
 
 const Method = enum {
     GET,
@@ -25,17 +18,6 @@ const Method = enum {
         return false;
     }
 };
-const MethodMap = StaticStringMap(Method).initComptime(.{
-    .{ "GET",  Method.GET },
-    .{ "POST", Method.POST },
-});
-
-test "method_map" {
-    // get => ?V
-    try std.testing.expectEqual(Method.GET,  MethodMap.get("GET"));
-    try std.testing.expectEqual(Method.POST, MethodMap.get("POST"));
-    try std.testing.expectEqual(null,        MethodMap.get("FOO"));
-}
 
 // terrible name for an allocator/hashmap-backed request
 // this doesn't really feel like idiomatic zig...
@@ -65,6 +47,18 @@ const RequestManaged = struct {
         };
     }
 };
+
+const MethodMap = StaticStringMap(Method).initComptime(.{
+    .{ "GET",  Method.GET },
+    .{ "POST", Method.POST },
+});
+
+test "method_map" {
+    // get => ?V
+    try std.testing.expectEqual(Method.GET,  MethodMap.get("GET"));
+    try std.testing.expectEqual(Method.POST, MethodMap.get("POST"));
+    try std.testing.expectEqual(null,        MethodMap.get("FOO"));
+}
 
 const HeadersT = [24][2][]const u8;
 const Request = struct {
@@ -98,7 +92,13 @@ const ParseError = error {
     NoMethod,
 };
 
-fn parse_request(text: []const u8) !Request {
+pub fn read_request(conn: Connection,
+    buffer: []u8) !void {
+    const reader = conn.stream.reader();
+    _ = try reader.read(buffer);
+}
+
+pub fn parse_request(text: []const u8) !Request {
     var lineIt = std.mem.splitSequence(u8, text, "\n");
     var lineno : u32 = 0;
     var out : Request = undefined;
@@ -159,52 +159,4 @@ test "parse" {
     try expect(r.headers[1][1], "curl/7.58.0");
     try expect(r.headers[2][0], "Accept");
     try expect(r.headers[2][1], "*/*");
-}
-
-// var ResponseCodeMap = 
-
-const ResponseMap = StaticStringMap([]const u8).initComptime(.{
-    .{ "200", (
-        "HTTP/1.1 200 OK\nContent-Length: 48"
-        ++ "\nContent-Type: text/html\n"
-        ++ "Connection: Closed\n\n<html><body>"
-        ++ "<h1>Hello, World!</h1></body></html>"
-    )},
-    .{ "404", (
-        "HTTP/1.1 404 Not Found\nContent-Length: 50"
-        ++ "\nContent-Type: text/html\n"
-        ++ "Connection: Closed\n\n<html><body>"
-        ++ "<h1>File not found!</h1></body></html>"
-    )},
-});
-pub fn get_response_message(code: []const u8) ?[]const u8 {
-    return ResponseMap.get(code);
-}
-
-pub fn send_response(code: []const u8, conn: Connection) !void {
-    const msg = get_response_message(code) orelse unreachable;
-    _ = try conn.stream.write(msg);
-}
-
-pub fn main() !u8 {
-    const socket = try http_cfg.Socket.init();
-    print("Socket {any}\n", .{ socket });
-    var server = try socket.address.listen(.{ .reuse_address = true });
-    var buf = http_buf.make_buffer(1024);
-    while (true) {
-        const conn = try server.accept();
-        _ = try http_request.read_request(conn, &buf);
-        const req = parse_request(&buf) catch |err| {
-            print("error: caught {any}\n", .{ err });
-            conn.stream.close();
-            continue;
-        };
-        if (std.mem.eql(u8, req.uri, "/")) {
-            try send_response("200", conn);
-        } else {
-            try send_response("404", conn);
-        }
-        conn.stream.close();
-    }
-    return 0;
 }
