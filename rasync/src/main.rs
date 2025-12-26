@@ -124,22 +124,21 @@ impl ArcWake for Task {
 
 struct MiniTokio {
     scheduled: mpsc::Receiver<Arc<Task>>,
-    sender: mpsc::Sender<Arc<Task>>,
+    // sender: mpsc::Sender<Arc<Task>>,
 }
 
 impl MiniTokio {
-    fn new() -> Self {
-        let (sender, scheduled) = mpsc::channel();
-        Self { scheduled, sender }
+    fn new(scheduled: mpsc::Receiver<Arc<Task>>) -> Self {
+        Self { scheduled }
     }
 
-    fn spawn<F>(&self, future: F)
-        where
-            F: Future<Output = ()> + Send + 'static,
-    {
-        Task::spawn(future, &self.sender);
-    }
-
+    // fn spawn<F>(&self, future: F)
+    //     where
+    //         F: Future<Output = ()> + Send + 'static,
+    // {
+    //     Task::spawn(future, &self.sender);
+    // }
+    //
     fn run(&self) {
         while let Ok(task) = self.scheduled.recv() {
             task.poll();
@@ -149,6 +148,7 @@ impl MiniTokio {
     // fn stop(&self) {
     // }
 }
+
 
 #[derive(Clone, Copy, Debug)]
 struct TaskStats {
@@ -204,15 +204,23 @@ impl TaskBin {
 static TASK_BIN : TaskBin = TaskBin::new();
 
 fn main() {
-    let mt = MiniTokio::new();
-    for i in 0..100 {
-        let cl = async move {
-            let when = Instant::now() + Duration::from_millis(100);
-            let future = Delay { when };
-            let result = future.await;
-            TASK_BIN.add(i, result);
-        };
-        mt.spawn(cl);
-    }
+    let (sender, scheduled) = mpsc::channel();
+    let sender = Arc::new(sender);
+
+    thread::spawn(move || {
+        for i in 0..100 {
+            let sender_handle = sender.clone();
+            let cl = async move {
+                let when = Instant::now() + Duration::from_millis(200);
+                let future = Delay { when };
+                let result = future.await;
+                TASK_BIN.add(i, result);
+            };
+
+            Task::spawn(cl, &sender_handle);
+        }
+    });
+
+    let mt = MiniTokio::new(scheduled);
     mt.run();
 }
