@@ -4,11 +4,12 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use std::thread;
-use std::sync::{mpsc, Arc, LazyLock, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::collections::HashMap;
 use futures::task::{self, ArcWake};
 
 struct Delay {
+    id: u32,
     when: Instant,
 }
 
@@ -31,6 +32,7 @@ impl TaskError {
 
 #[derive(Clone, Copy, Debug)]
 struct DelayResult {
+    id: u32,
     result: Option<TaskError>,
     roll: u32,
 }
@@ -49,7 +51,7 @@ impl Future for Delay {
                 et = Some(TaskError::new(ErrorType::Io));
             }
             let result = et;
-            return Poll::Ready(DelayResult{ result, roll });
+            return Poll::Ready(DelayResult{ id: self.id, result, roll });
         }
 
         let waker = cx.waker().clone();
@@ -96,7 +98,6 @@ impl Task {
         let mut cx = Context::from_waker(&waker);
 
         let mut task_future = self.task_future.try_lock().unwrap();
-
         task_future.poll(&mut cx);
     }
 
@@ -132,13 +133,6 @@ impl MiniTokio {
         Self { scheduled }
     }
 
-    // fn spawn<F>(&self, future: F)
-    //     where
-    //         F: Future<Output = ()> + Send + 'static,
-    // {
-    //     Task::spawn(future, &self.sender);
-    // }
-    //
     fn run(&self) {
         while let Ok(task) = self.scheduled.recv() {
             task.poll();
@@ -157,34 +151,30 @@ struct TaskStats {
     success_rate: f32,
 }
 
-fn sum_stats(t1: TaskStats, t2: TaskStats) -> TaskStats {
-    let ftotal = t1.total as f32 + t2.total as f32;
-    assert!(ftotal > 0.0);
-    let ratio1 : f32 = t1.total as f32 / ftotal;
-    let ratio2 : f32 = t2.total as f32 / ftotal;
-
-    let roll_avg = (t1.roll_avg * ratio1) + (t2.roll_avg * ratio2);
-    let success_rate = (t1.success_rate * ratio1) + (t2.success_rate * ratio2);
-    let total = t1.total + t2.total;
-    let out = TaskStats { total, roll_avg, success_rate };
-    out
-}
-
 struct TaskBin {
-    tasks : LazyLock<Mutex<HashMap<u32, TaskStats>>>,
+    tasks: HashMap<u32, TaskStats>,
+    // thread: std::thread::JoinHandle,
+    rcvr: mpsc::Receiver<DelayResult>,
 }
 
 impl TaskBin {
-    const fn new() -> Self {
+    fn new(rcvr: mpsc::Receiver<DelayResult>) -> Self {
         TaskBin {
-            tasks: LazyLock::new(|| { Mutex::new(HashMap::new()) }),
+            tasks: HashMap::new(),
+            rcvr,
+            // thread
         }
     }
-    fn add(&self, id: u32, result: DelayResult) {
-        let _ = id;
-        let id = 0;
 
-        let mut tasks = self.tasks.lock().unwrap();
+    fn run(&mut self) {
+        while let Ok(result) = self.rcvr.recv() {
+            self.add(result);
+        }
+    }
+
+    fn add(&mut self, result: DelayResult) {
+        let id = result.id;
+
         let success_rate : f32;
         match result.result {
             None => success_rate = 1.0,
@@ -192,35 +182,60 @@ impl TaskBin {
         }
         let roll_avg : f32 = result.roll as f32;
         let mut stats = TaskStats{ total:1, roll_avg, success_rate };
-        let prev_stats = tasks.insert(id, stats);
+        let prev_stats = self.tasks.insert(id, stats);
         if let Some(prev) = prev_stats {
-            stats = sum_stats(stats, prev);
-            tasks.insert(id, stats);
+            stats = Self::sum_stats(stats, prev);
+            self.tasks.insert(id, stats);
         }
         println!("--> id:{} stats:{:?}", id, stats);
     }
+
+    fn sum_stats(t1: TaskStats, t2: TaskStats) -> TaskStats {
+        let ftotal = t1.total as f32 + t2.total as f32;
+        assert!(ftotal > 0.0);
+        let ratio1 : f32 = t1.total as f32 / ftotal;
+        let ratio2 : f32 = t2.total as f32 / ftotal;
+
+        let roll_avg = (t1.roll_avg * ratio1) + (t2.roll_avg * ratio2);
+        let success_rate = (t1.success_rate * ratio1) + (t2.success_rate * ratio2);
+        let total = t1.total + t2.total;
+        let out = TaskStats { total, roll_avg, success_rate };
+        out
+    }
+
 }
 
-static TASK_BIN : TaskBin = TaskBin::new();
-
 fn main() {
-    let (sender, scheduled) = mpsc::channel();
-    let sender = Arc::new(sender);
+    let (mt_sender, mt_rcvr) = mpsc::channel();
+    let mt_sender = Arc::new(mt_sender);
 
-    thread::spawn(move || {
-        for i in 0..100 {
-            let sender_handle = sender.clone();
-            let cl = async move {
-                let when = Instant::now() + Duration::from_millis(200);
-                let future = Delay { when };
-                let result = future.await;
-                TASK_BIN.add(i, result);
+    let mut threads = vec![];
+    threads.push(thread::spawn(|| {
+        let mt = MiniTokio::new(mt_rcvr);
+        mt.run();
+    }));
+
+    let (stat_sender, stat_rcvr) = mpsc::channel();
+    threads.push(thread::spawn(|| {
+        let mut tb = TaskBin::new(stat_rcvr);
+        tb.run();
+    }));
+
+    for id in 0..2 {
+        let stat_sender = stat_sender.clone();
+        let cl = async move {
+            let future = Delay { 
+                id,
+                when: Instant::now() + Duration::from_millis(200),
             };
+            let result = future.await;
+            let _ = stat_sender.send(result);
+        };
+        Task::spawn(cl, &mt_sender.clone());
+    };
 
-            Task::spawn(cl, &sender_handle);
-        }
-    });
+    for t in threads {
+        let _ = t.join();
+    }
 
-    let mt = MiniTokio::new(scheduled);
-    mt.run();
 }
