@@ -7,14 +7,15 @@
 #define MAX_EXPLOSIONS 20
 #define MAX_ENEMIES 10
 #define MAX_CITIES 6
+#define MAX_ROCKS 10
 
-// gravity!  missiles and rocks need mass
 // unrelated: 1brc with hashmap with chaining impl
 
 typedef struct { 
     Vector2 pos; 
     bool active; 
 } City;
+
 typedef struct { 
     Vector2 start;
     Vector2 pos; 
@@ -31,6 +32,15 @@ typedef struct {
     float maxRadius; 
     bool active; 
 } Explosion;
+
+typedef struct {
+    Vector2 pos;
+    Vector2 start;
+    Vector2 target;
+    Vector2 velocity;
+    float radius;
+    bool active;
+} Rock;
 
 void DrawGlowLine(Vector2 start, Vector2 end, Color col) {
     Vector2 mid = { (start.x + end.x) / 2, (start.y + end.y) / 2 };
@@ -53,6 +63,10 @@ void apply_velocity(Vector2* out, Vector2 velocity, float mult) {
 
 const int screenWidth = 1024;
 const int screenHeight = 768;
+bool on_screen(Vector2 pos) {
+    return pos.x >= 0 && pos.x <= screenWidth
+        && pos.y >= 0 && pos.y <= screenHeight;
+}
 
 int main(void) {
     InitWindow(screenWidth, screenHeight, "Raylib Neon Missile Command");
@@ -70,6 +84,7 @@ int main(void) {
     Missile playerMissiles[MAX_MISSILES] = { 0 };
     Missile enemyMissiles[MAX_ENEMIES] = { 0 };
     Explosion explosions[MAX_EXPLOSIONS] = { 0 };
+    Rock rocks[MAX_ROCKS] = { 0 };
 
     // Possible trail colors
     Color neonColors[] = { RED, MAGENTA, LIME, SKYBLUE, ORANGE, VIOLET };
@@ -135,14 +150,50 @@ int main(void) {
                 }
             }
 
+            // SPAWN ROCKS
+            if (GetRandomValue(0, 99) < 100) {
+                for (int i = 0; i < MAX_ROCKS; i++) {
+                    Rock* rock = &rocks[i];
+                    if (rock->active) continue;
+
+                    rock->active = true;
+                    rock->radius = 30.0;
+                    rock->start = (Vector2){ GetRandomValue(0, screenWidth), 0 };
+                    rock->pos = rock->start;
+                    rock->velocity = (Vector2){ 0, 10.0 };
+                }
+            }
 
             // UPDATE & COLLISION
+            for (int i = 0; i < MAX_ROCKS; i++) {
+                Rock* rock = &rocks[i];
+                if (!rock->active) continue;
+                apply_velocity(&rock->pos, rock->velocity, speedMultiplier);
+                if (!on_screen(rock->pos)) {
+                    rock->active = false;
+                    continue;
+                }
+            }
+
             for (int i = 0; i < MAX_MISSILES; i++) {
                 Missile* msl = &playerMissiles[i];
                 if (!msl->active) continue;
 
                 apply_velocity(&msl->pos, msl->velocity, speedMultiplier);
+                bool explodes = false;
                 if (CheckCollisionPointCircle(msl->pos, msl->target, 5.0f)) {
+                    explodes = true;
+                } else { 
+                    for (int i = 0; i < MAX_ROCKS; i++) {
+                        Rock* rock = &rocks[i];
+                        if (!rock->active) continue;
+
+                        if (CheckCollisionPointCircle(msl->pos, msl->target, 5.0f)) {
+                            explodes = true;
+                        }
+                    }
+                }
+                if (explodes) {
                     msl->active = false;
                     for (int j = 0; j < MAX_EXPLOSIONS; j++) {
                         if (!explosions[j].active) {
@@ -161,9 +212,30 @@ int main(void) {
 
                 for (int j = 0; j < MAX_EXPLOSIONS; j++) {
                     if (!explosions[j].active) continue;
-                    if (CheckCollisionCircles(enemy->pos, 2, explosions[j].pos, explosions[j].radius)) {
+
+                    if (CheckCollisionCircles(enemy->pos, 2, 
+                                              explosions[j].pos, explosions[j].radius)) {
                         enemy->active = false;
                         score += 100;
+                        break;
+                    }
+                }
+
+                for (int j = 0; j < MAX_ROCKS; j++) {
+                    Rock* rock = &rocks[j];
+                    if (!rock->active) continue;
+
+                    if (CheckCollisionCircles(enemy->pos, 2,
+                                rocks[j].pos, rocks[j].radius)) {
+                        enemy->active = false;
+
+                        for (int j = 0; j < MAX_EXPLOSIONS; j++) {
+                            if (!explosions[j].active) {
+                                explosions[j] = (Explosion){ enemy->pos, 0, 45, true };
+                                break;
+                            }
+                        }
+                        break;
                     }
                 }
 
@@ -177,7 +249,8 @@ int main(void) {
                         enemy->active = false;
                     }
                 }
-                if (enemy->pos.y > screenHeight) {
+
+                if (!on_screen(enemy->pos)) {
                     enemy->active = false;
                     continue;
                 }
@@ -240,6 +313,14 @@ int main(void) {
                     if (exp->active) {
                         DrawCircleV(exp->pos, exp->radius, Fade(WHITE, 0.4f));
                         DrawCircleLines(exp->pos.x, exp->pos.y, exp->radius, GOLD);
+                    }
+                }
+
+                for (int i = 0; i < MAX_ROCKS; i++) {
+                    Rock* rock = &rocks[i];
+                    if (rock->active) {
+                        DrawCircleV(rock->pos, rock->radius, Fade(GRAY, 0.4f));
+                        DrawCircleLines(rock->pos.x, rock->pos.y, rock->radius, GRAY);
                     }
                 }
 
