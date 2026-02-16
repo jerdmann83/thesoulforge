@@ -1,6 +1,7 @@
 #include "raylib.h"
 #include <math.h>
 #include <stdio.h>
+#include <assert.h>
 
 #define MAX_MISSILES 4
 #define MAX_EXPLOSIONS 20
@@ -15,7 +16,7 @@ typedef struct {
     bool active; 
 } City;
 typedef struct { 
-    Vector2 start; // Store start for drawing the trail
+    Vector2 start;
     Vector2 pos; 
     Vector2 target; 
     Vector2 velocity; 
@@ -41,9 +42,19 @@ float get_angle(Vector2 start, Vector2 end) {
     return atan2(end.y - start.y, end.x - start.x);
 }
 
+Vector2 get_velocity(float angle, float speed) {
+    return (Vector2){ cos(angle) * speed, sin(angle) * speed };
+}
+
+void apply_velocity(Vector2* out, Vector2 velocity, float mult) {
+    out->x += velocity.x * mult;
+    out->y += velocity.y * mult;
+}
+
+const int screenWidth = 1024;
+const int screenHeight = 768;
+
 int main(void) {
-    const int screenWidth = 1024;
-    const int screenHeight = 768;
     InitWindow(screenWidth, screenHeight, "Raylib Neon Missile Command");
 
     int score = 0;
@@ -66,6 +77,11 @@ int main(void) {
     SetTargetFPS(60);
 
     while (!WindowShouldClose()) {
+        float speedMultiplier = 1.0;
+        if (IsKeyDown(KEY_SPACE)) {
+            speedMultiplier = .1;
+        }
+
         if (!gameOver) {
             // FIRE PLAYER MISSILE
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -78,21 +94,14 @@ int main(void) {
                         msl->target = GetMousePosition();
                         msl->color = SKYBLUE;
                         
-                        // PLAYER SPEED (Constant but fast)
                         float angle = get_angle(siloPos, msl->target);
-                        printf("%f,%f -> %f,%f -> angle is %f\n", 
-                                siloPos.x,
-                                siloPos.y,
-                                msl->target.x,
-                                msl->target.y,
-                                angle);
-                        msl->velocity = (Vector2){ cos(angle) * 10.0f, sin(angle) * 10.0f };
+                        msl->velocity = get_velocity(angle, 10.0f);
                         break;
                     }
                 }
             }
 
-            // SPAWN ENEMY MISSILES (Variable Speeds)
+            // SPAWN ENEMY MISSILES
             if (GetRandomValue(0, 100) < 99) {
                 for (int i = 0; i < MAX_ENEMIES; i++) {
                     Missile* msl = &enemyMissiles[i];
@@ -100,32 +109,39 @@ int main(void) {
                         msl->active = true;
                         msl->start = (Vector2){ (float)GetRandomValue(0, screenWidth), 0 };
                         msl->pos = msl->start;
+
                         msl->color = RED;
                         msl->color_phase = (float)GetRandomValue(0, 100) * PI;
 
-                        int targetIdx = GetRandomValue(0, MAX_CITIES);
-                        msl->target = (targetIdx < MAX_CITIES) ? cities[targetIdx].pos : siloPos;
+                        msl->target = (Vector2){ -1, -1 };
+                        while (msl->target.x < 0) {
+                            int targetIdx = GetRandomValue(0, MAX_CITIES);
+                            if (targetIdx == MAX_CITIES) {
+                                msl->target = siloPos;
+                                continue;
+                            }
+                            City* city = &cities[targetIdx];
+                            if (city->active) {
+                                msl->target = city->pos;
+                                continue;
+                            }
+                        }
                         
-                        float speed = (float)GetRandomValue(10, 35) / 10.0f;
+                        float speed = (float)GetRandomValue(10, 35) / 10.f;
                         float angle = get_angle(msl->pos, msl->target);
-                        msl->velocity = (Vector2){ cos(angle) * speed, sin(angle) * speed };
-                        printf("emissile: start %f,%f target %f,%f\n",
-                                msl->start.x,
-                                msl->start.y,
-                                msl->target.x,
-                                msl->target.y);
+                        msl->velocity = get_velocity(angle, speed);
                         break;
                     }
                 }
             }
 
-            // UPDATE & COLLISION (Standard logic)
+
+            // UPDATE & COLLISION
             for (int i = 0; i < MAX_MISSILES; i++) {
                 Missile* msl = &playerMissiles[i];
                 if (!msl->active) continue;
 
-                msl->pos.x += msl->velocity.x;
-                msl->pos.y += msl->velocity.y;
+                apply_velocity(&msl->pos, msl->velocity, speedMultiplier);
                 if (CheckCollisionPointCircle(msl->pos, msl->target, 5.0f)) {
                     msl->active = false;
                     for (int j = 0; j < MAX_EXPLOSIONS; j++) {
@@ -138,15 +154,15 @@ int main(void) {
             }
 
             for (int i = 0; i < MAX_ENEMIES; i++) {
-                Missile* msl = &enemyMissiles[i];
-                if (!msl->active) continue;
-                msl->pos.x += msl->velocity.x;
-                msl->pos.y += msl->velocity.y;
+                Missile* enemy = &enemyMissiles[i];
+                if (!enemy->active) continue;
+
+                apply_velocity(&enemy->pos, enemy->velocity, speedMultiplier);
 
                 for (int j = 0; j < MAX_EXPLOSIONS; j++) {
                     if (!explosions[j].active) continue;
-                    if (CheckCollisionCircles(msl->pos, 2, explosions[j].pos, explosions[j].radius)) {
-                        msl->active = false;
+                    if (CheckCollisionCircles(enemy->pos, 2, explosions[j].pos, explosions[j].radius)) {
+                        enemy->active = false;
                         score += 100;
                     }
                 }
@@ -155,12 +171,16 @@ int main(void) {
                     City* city = &cities[c];
                     if (!city->active) continue;
 
-                    if (CheckCollisionPointRec(msl->pos, (Rectangle){city->pos.x-15, city->pos.y-10, 30, 20})) {
+                    if (CheckCollisionPointRec(enemy->pos, 
+                                (Rectangle){city->pos.x-15, city->pos.y-10, 30, 20})) {
                         city->active = false;
-                        msl->active = false;
+                        enemy->active = false;
                     }
                 }
-                if (msl->pos.y > screenHeight) msl->active = false;
+                if (enemy->pos.y > screenHeight) {
+                    enemy->active = false;
+                    continue;
+                }
             }
 
             for (int i = 0; i < MAX_EXPLOSIONS; i++) {
@@ -172,7 +192,12 @@ int main(void) {
             }
 
             int activeCities = 0;
-            for (int i = 0; i < MAX_CITIES; i++) if (cities[i].active) activeCities++;
+            for (int i = 0; i < MAX_CITIES; i++) {
+                if (cities[i].active) {
+                    activeCities++;
+                }
+            }
+
             // if (activeCities == 0) gameOver = true;
 
         } else if (IsKeyPressed(KEY_R)) { 
