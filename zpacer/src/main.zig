@@ -3,6 +3,27 @@ const c = @cImport({
     @cInclude("/usr/include/postgresql/libpq-fe.h");
 });
 
+fn lap(tag: []const u8, ts: *i64) void {
+    const now = std.time.milliTimestamp();
+    const delta = now - ts.*;
+    std.debug.print("{s}: {d}ms\n", .{ tag, delta });
+    ts.* = now;
+}
+
+const QueryError = error{SomeError};
+
+fn run_query(conn: *c.PGconn, query: []const u8) anyerror!void {
+    const res = c.PQexec(conn, query.ptr);
+    defer c.PQclear(res);
+
+    // const msg = c.PQerrorMessage(conn);
+    const rc = c.PQresultStatus(res);
+    // std.debug.print("query={s} msg={s} res={any} rc={any}\n", .{ query, msg, res, rc });
+    if (rc != c.PGRES_COMMAND_OK) {
+        return QueryError.SomeError;
+    }
+}
+
 pub fn main() !void {
     const conn_str = "host=localhost user=postgres password=postgres";
 
@@ -24,39 +45,24 @@ pub fn main() !void {
     ;
     try run_query(conn, create_query);
 
-    _ = c.PQexec(conn, "BEGIN");
-    const lim = 1;
-    for (0..lim) |i| {
-        var query_buffer: [512]u8 = undefined;
-        const query = try std.fmt.bufPrint(&query_buffer, "INSERT INTO pacer (col1, col2, col3, col4, col5, col6, col7, col8, col9, col10) VALUES ('val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}')", .{ i, i, i, i, i, i, i, i, i, i });
+    var ts = std.time.milliTimestamp();
+    lap("begin", &ts);
 
+    _ = c.PQexec(conn, "BEGIN");
+    const lim = 1000;
+    var buf: [1024]u8 = undefined;
+    for (0..lim) |i| {
+        const query = try std.fmt.bufPrintZ(&buf, "INSERT INTO pacer (col1, col2, col3, col4, col5, col6, col7, col8, col9, col10) VALUES ('val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}', 'val_{d}')", .{ i, i, i, i, i, i, i, i, i, i });
         try run_query(conn, query);
     }
     _ = c.PQexec(conn, "COMMIT");
-    std.debug.print("Inserted {} rows.\n", .{lim});
+    lap("inserted rows", &ts);
 
     _ = c.PQexec(conn, "BEGIN");
     for (0..lim) |i| {
-        var update_query_buffer: [512]u8 = undefined;
-        const update_query = try std.fmt.bufPrint(&update_query_buffer, "UPDATE pacer SET col1 = 'upd_{d}' WHERE id = {d}", .{ i, i + 1 });
-        std.debug.print("insert query is {s}\n", .{update_query});
-
+        const update_query = try std.fmt.bufPrintZ(&buf, "UPDATE pacer SET col1 = 'upd_{d}' WHERE id = {d}", .{ i, i + 1 });
         try run_query(conn, update_query);
     }
     _ = c.PQexec(conn, "COMMIT");
-    std.debug.print("Updated {} rows.\n", .{lim});
-}
-
-const QueryError = error{SomeError};
-
-fn run_query(conn: *c.PGconn, query: []const u8) anyerror!void {
-    const res = c.PQexec(conn, query.ptr);
-    defer c.PQclear(res);
-
-    const msg = c.PQerrorMessage(conn);
-    const rc = c.PQresultStatus(res);
-    std.debug.print("query={s} msg={s} res={any} rc={any}\n", .{ query, msg, res, rc });
-    if (rc != c.PGRES_COMMAND_OK) {
-        return QueryError.SomeError;
-    }
+    lap("updated rows", &ts);
 }
